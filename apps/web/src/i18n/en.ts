@@ -1,0 +1,22 @@
+import type { ar } from './ar';
+export const en: Record<keyof typeof ar,string> = {
+  admin:'Administration',
+  title:'Work Management Platform',subtitle:'Enterprise workspace foundation',
+  foundation:'Platform foundation',phase:'Phase one',
+  eyebrow:'One workspace. A solid foundation.',heading:'Built for the work ahead.',
+  description:'The foundation of your work, task and project management platform. This page shows actual service availability, without customer data or demo metrics.',
+  services:'Core service status',servicesDescription:'Live checks for the database, private storage and background processing.',
+  database:'Database',databaseHint:'PostgreSQL · Prisma · migrated schema',
+  redis:'Cache',redisHint:'Redis · authenticated connection',
+  queue:'Background processing',queueHint:'BullMQ · actual worker round trip',
+  storage:'Private storage',storageHint:'S3 · bucket availability check',
+  up:'Connected',down:'Unavailable',checking:'Checking',refresh:'Check again',
+  ready:'Core services are ready',notReady:'Some services need attention',
+  unavailable:'Cannot reach the server. Check that the API and core services are running.',
+  lastChecked:'Last checked',notChecked:'No completed check yet',
+  architecture:'Architecture for growth',architectureDescription:'Separate frontend and backend applications in one repository, with shared packages and clear responsibilities.',
+  isolation:'Isolation from the start',isolationDescription:'A restricted database role, transaction-local organization context and row-level access policies.',
+  honest:'Development status',honestDescription:'This is a foundation verification page. Organizations, authentication, tasks and projects will be built and tested in the following phases.',
+  api:'API documentation',live:'Server liveness',language:'العربية',theme:'Toggle appearance',
+  footer:'Local development environment · not for production',note:'This public page never displays organization data.',
+};

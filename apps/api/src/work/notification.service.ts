@@ -1,0 +1,22 @@
+import {Injectable,Logger,NotFoundException,type OnApplicationBootstrap,type OnModuleDestroy} from '@nestjs/common';
+import type {Prisma} from '@prisma/client';
+import {notificationPreferencesSchema,type WorkQuery} from '@work/shared-schemas';
+import {PrismaService} from '../database/prisma.service';
+import {validate} from '../common/validation';
+import {environment} from '../config/environment';
+import {MailService} from '../mail/mail.service';
+import {OrganizationService} from './organization.service';
+import type {WorkIdentity} from './identity.service';
+@Injectable()
+export class NotificationService implements OnApplicationBootstrap,OnModuleDestroy{
+  private timer:ReturnType<typeof setInterval>|undefined;private running=false;private readonly logger=new Logger(NotificationService.name);
+  constructor(private readonly db:PrismaService,private readonly organizations:OrganizationService,private readonly mail:MailService){}
+  onApplicationBootstrap(){this.timer=setInterval(()=>{void this.dispatch().catch(()=>this.logger.error('Reminder dispatch failed'));},60000);this.timer.unref();}
+  onModuleDestroy(){if(this.timer)clearInterval(this.timer);}
+  async dispatch(){if(this.running)return 0;this.running=true;try{const rows=await this.db.$queryRaw<Array<{count:number}>>`SELECT work_dispatch_reminders(${new URL(environment.WEB_ORIGIN).origin}) AS count`;return rows[0]?.count??0;}finally{this.running=false;}}
+  async emit(tx:Prisma.TransactionClient,organizationId:string,recipients:Array<string|null>,kind:string,resourceType:'tasks'|'meetings'|'requests'|'expenses'|'projects'|'budgets',resourceId:string,eventKey:string){const rows=await tx.membership.findMany({where:{organizationId,id:{in:[...new Set(recipients.filter((id):id is string=>!!id))]},active:true,user:{disabledAt:null,deletedAt:null}},select:{id:true,user:{select:{email:true}}}});for(const row of rows){const preference=await tx.notificationPreference.findUnique({where:{organizationId_membershipId:{organizationId,membershipId:row.id}}});if(preference?.inAppEnabled!==false)await tx.workNotification.createMany({data:[{organizationId,membershipId:row.id,kind,resourceType,resourceId,deduplicationKey:eventKey}],skipDuplicates:true});if(preference?.emailEnabled){const link=new URL(`/app/${resourceType}/${resourceId}`,environment.WEB_ORIGIN);await this.mail.enqueue(tx,{recipient:row.user.email,subject:'تحديث في مساحة العمل | Workspace update',textBody:link.toString()});}}}
+  async list(user:WorkIdentity,organizationId:string,query:WorkQuery){return this.organizations.execute(user,organizationId,async(tx,access)=>{const where={organizationId,membershipId:access.membershipId};return {items:await tx.workNotification.findMany({where,skip:(query.page-1)*query.pageSize,take:query.pageSize,orderBy:{createdAt:'desc'}}),total:await tx.workNotification.count({where}),unread:await tx.workNotification.count({where:{...where,readAt:null}})};});}
+  async read(user:WorkIdentity,organizationId:string,id:string|undefined){return this.organizations.execute(user,organizationId,async(tx,access)=>{const result=await tx.workNotification.updateMany({where:{organizationId,membershipId:access.membershipId,...(id?{id}:{})},data:{readAt:new Date()}});if(id&&!result.count)throw new NotFoundException('Notification not found');return {ok:true};});}
+  async preferences(user:WorkIdentity,organizationId:string){return this.organizations.execute(user,organizationId,async(tx,access)=>(await tx.notificationPreference.findUnique({where:{organizationId_membershipId:{organizationId,membershipId:access.membershipId}}}))??{inAppEnabled:true,emailEnabled:false,remindersEnabled:true});}
+  async savePreferences(user:WorkIdentity,organizationId:string,body:unknown){const data=validate(notificationPreferencesSchema,body);return this.organizations.execute(user,organizationId,async(tx,access)=>tx.notificationPreference.upsert({where:{organizationId_membershipId:{organizationId,membershipId:access.membershipId}},create:{organizationId,membershipId:access.membershipId,...data},update:data}));}
+}

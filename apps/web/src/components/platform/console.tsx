@@ -1,0 +1,44 @@
+import {BillingAdminPanel} from './billing';
+import {AiAdminPanel} from './ai';
+import {useCallback,useEffect,useState,type FormEvent} from 'react';
+import Head from 'next/head';
+import Link from 'next/link';
+import type {PlatformSessionView} from '@work/shared-types';
+import {platformResources,type PlatformResource} from '@work/shared-schemas';
+import {platformDictionary,platformLabel,type PlatformText} from '../../i18n/platform';
+import {platformRequest,PlatformHttpError} from '../../services/platform';
+import {ResourcePanel,permitted} from './resources';
+import {MonitoringPanel,OverviewPanel,SecurityPanel,SettingsPanel} from './panels';
+import {errorLabel} from './forms';
+import {usePlatformBrand} from '../../hooks/use-platform-brand';
+
+const groups=[['groupGeneral',['overview','organizations','users','accounts','roles']],['groupBusiness',['billing','coupons','plans','subscriptions','invoices','ledger']],['groupControl',['ai','pages','settings','security','audit','monitoring']]] as const;
+const icons:Record<string,string>={overview:'◈',organizations:'▦',users:'♧',accounts:'▣',roles:'◇',plans:'▤',subscriptions:'↻',invoices:'≡',ledger:'⇄',pages:'▧',settings:'⚙',security:'◉',audit:'☷',monitoring:'⌁'};
+
+function Login({t,error,onLogin,onRetry}:{t:PlatformText;error:string;onLogin:(email:string,password:string)=>Promise<void>;onRetry:()=>void}) {
+  const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [pending,setPending]=useState(false);const [failure,setFailure]=useState('');
+  async function submit(event:FormEvent) {event.preventDefault();setPending(true);setFailure('');try{await onLogin(email,password);setPassword('');}catch(reason){setFailure(errorLabel(t,reason));}finally{setPending(false);}}
+  return <div className="admin-login-layout"><section className="admin-login-story"><span className="admin-eyebrow">{t.control}</span><h1>{t.admin}</h1><p>{t.subtitle}</p><div className="admin-login-map">{groups.map(([key,items])=><div key={key}><h2>{platformLabel(t,key)}</h2><p>{items.map(item=>platformLabel(t,item)).join(' · ')}</p></div>)}</div><p className="admin-login-footnote">{t.ownerNote}</p></section><section className="admin-login-card"><span className="admin-lock" aria-hidden="true">◇</span><h2>{t.login}</h2><p>{t.loginHint}</p><form onSubmit={event=>void submit(event)}><label htmlFor="admin-email">{t.email}</label><input id="admin-email" type="email" autoComplete="username" required value={email} maxLength={254} onChange={event=>setEmail(event.target.value)} dir="ltr"/><label htmlFor="admin-password">{t.password}</label><input id="admin-password" type="password" autoComplete="current-password" required maxLength={128} value={password} onChange={event=>setPassword(event.target.value)} dir="ltr"/>{(failure||error)&&<p className="admin-error" role="alert">{failure||error}</p>}<button className="admin-button" disabled={pending}>{pending?t.loading:t.signIn}</button></form>{error&&<button className="admin-text-button" onClick={onRetry}>{t.retry}</button>}<aside className="admin-setup"><strong>{t.setupTitle}</strong><p>{t.setupHint}</p><code dir="ltr">{t.bootstrap}</code></aside></section></div>;
+}
+
+export function PlatformConsole({section='overview'}:{section?:string}) {
+  const [locale,setLocale]=useState<'ar'|'en'>('ar');const [dark,setDark]=useState(false);const [session,setSession]=useState<PlatformSessionView|null>();const [error,setError]=useState('');const [revision,setRevision]=useState(0);const [menuOpen,setMenuOpen]=useState(false);
+  const t=platformDictionary(locale);const signedOut=useCallback(()=>{setSession(null);setError('');},[]);
+  const brand=usePlatformBrand();
+  useEffect(()=>{const saved=localStorage.getItem('work.locale');if(saved==='ar'||saved==='en')setLocale(saved);setDark(localStorage.getItem('work.theme')==='dark');},[]);
+  useEffect(()=>{document.documentElement.lang=locale;document.documentElement.dir=locale==='ar'?'rtl':'ltr';document.documentElement.dataset.theme=dark?'dark':'light';},[locale,dark]);
+  useEffect(()=>{const controller=new AbortController();void platformRequest<PlatformSessionView>('platform/auth/me',{signal:controller.signal}).then(value=>{setSession(value);setError('');},reason=>{if(controller.signal.aborted)return;setSession(null);if(!(reason instanceof PlatformHttpError&&reason.status===401))setError(errorLabel(t,reason));});return ()=>controller.abort();},[revision,t]);
+  useEffect(()=>setMenuOpen(false),[section]);
+  const changeLocale=()=>{const next=locale==='ar'?'en':'ar';setLocale(next);localStorage.setItem('work.locale',next);};
+  const changeTheme=()=>{setDark(!dark);localStorage.setItem('work.theme',!dark?'dark':'light');};
+  async function signOut() {if(!session)return;try{await platformRequest('platform/auth/logout',{method:'POST',csrf:session.csrf});signedOut();}catch(reason){if(reason instanceof PlatformHttpError&&reason.status===401)signedOut();else setError(errorLabel(t,reason));}}
+  const resource=platformResources.includes(section as PlatformResource)?section as PlatformResource:undefined;
+  const required=section==='billing'?'billing.read':section==='coupons'?'coupons.read':section==='ai'?'ai.read':section==='security'?null:section==='settings'?'settings.read':section==='monitoring'?'monitoring.read':section==='overview'?'overview.read':resource?`${resource}.read`:null;
+  const known=!!resource||['overview','settings','security','monitoring','ai','billing','coupons'].includes(section);
+  return <div className="admin-root"><Head><title>{`${platformLabel(t,section)} · ${t.admin}`}</title><meta name="robots" content="noindex,nofollow"/></Head>
+    <header className="admin-header"><div className="admin-header-brand"><Link href="/" className="admin-logo" aria-label={t.back}>W<span>•</span></Link><div><strong>{t.admin}</strong><small>{brand?.platformName??t.brand}</small></div></div><div className="admin-header-actions"><button className="admin-button secondary small" onClick={changeLocale}>{t.language}</button><button className="admin-icon-button" onClick={changeTheme} aria-label={t.theme}>{dark?'☀':'☾'}</button>{session&&<button className="admin-button secondary small" onClick={()=>void signOut()}>{t.signOut}</button>}</div></header>
+    {session===undefined?<main className="admin-empty" role="status">{t.loading}</main>:!session?<main><Login t={t} error={error} onRetry={()=>setRevision(v=>v+1)} onLogin={async(email,password)=>{const result=await platformRequest<PlatformSessionView>('platform/auth/login',{method:'POST',body:{email,password}});setSession(result);setError('');}}/></main>:<div className="admin-workspace"><button className="admin-mobile-menu admin-button secondary" aria-expanded={menuOpen} onClick={()=>setMenuOpen(!menuOpen)}>{t.control} ☰</button><aside className={`admin-sidebar ${menuOpen?'open':''}`}><div className="admin-profile"><span>{session.actor.displayName.slice(0,1)}</span><div><strong>{session.actor.displayName}</strong><small>{session.actor.email}</small></div></div><nav aria-label={t.control}>{groups.map(([key,items])=><div className="admin-nav-group" key={key}><h2>{platformLabel(t,key)}</h2>{items.filter(item=>item==='security'||permitted(session,`${item}.read`)).map(item=><Link key={item} href={item==='overview'?'/platform':`/platform/${item}`} aria-current={section===item?'page':undefined}><span aria-hidden="true">{icons[item]}</span>{platformLabel(t,item)}</Link>)}</div>)}</nav><p className="admin-sidebar-foot">{session.actor.isOwner?t.isOwner:t.ownerNote}</p></aside>
+      <main className="admin-main"><div className="admin-page-heading"><div><span className="admin-eyebrow">{t.control} / {platformLabel(t,section)}</span><h1>{platformLabel(t,section)}</h1><p>{t.subtitle}</p></div><span className="admin-header-emblem" aria-hidden="true">{icons[section]??'◇'}</span></div>{error&&<p className="admin-error" role="alert">{error}</p>}{!known||required&&!permitted(session,required)?<section className="admin-panel"><p role="alert">{t.forbidden}</p></section>:section==='billing'||section==='coupons'?<BillingAdminPanel t={t} session={session} locale={locale} initialTab={section==='coupons'?'coupons':'plans'}/>:section==='ai'?<AiAdminPanel t={t} session={session} locale={locale}/>:resource?<ResourcePanel key={`${resource}-${locale}`} resource={resource} t={t} session={session}/>:section==='overview'?<OverviewPanel t={t}/>:section==='settings'?<SettingsPanel t={t} session={session}/>:section==='monitoring'?<MonitoringPanel t={t}/>:<SecurityPanel t={t} session={session} onSignedOut={signedOut}/>}</main>
+    </div>}
+  </div>;
+}

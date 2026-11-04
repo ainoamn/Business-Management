@@ -1,0 +1,1895 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(uuid()) @db.Uuid
+  email        String       @unique @db.VarChar(254)
+  passwordHash String       @map("password_hash")
+  displayName  String       @map("display_name") @db.VarChar(120)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt    DateTime?    @map("deleted_at") @db.Timestamptz(3)
+  disabledAt   DateTime?    @map("disabled_at") @db.Timestamptz(3)
+  username String? @unique @db.VarChar(40)
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  actionTokens UserActionToken[]
+  aiRequests AiRequest[]
+  memberships Membership[]
+  sessions     UserSession[]
+  @@index([displayName(ops: raw("gin_trgm_ops"))],type:Gin,map:"users_search_name")
+  @@index([email(ops: raw("gin_trgm_ops"))],type:Gin,map:"users_search_email")
+  @@map("users")
+}
+
+model Organization {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String       @db.VarChar(160)
+  slug         String       @unique @db.VarChar(80)
+  locale       String       @default("ar") @db.VarChar(5)
+  timezone     String       @default("Asia/Muscat") @db.VarChar(64)
+  currency     String       @default("OMR") @db.VarChar(3)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt    DateTime?    @map("deleted_at") @db.Timestamptz(3)
+  memberships Membership[]
+  auditLogs    AuditLog[]
+  suspendedAt  DateTime?    @map("suspended_at") @db.Timestamptz(3)
+  subscriptions PlatformSubscription[]
+  billingOrders BillingOrder[]
+  billingEvents BillingEvent[]
+  billingTrial BillingTrialUse?
+  invoices PlatformInvoice[]
+  ledger PlatformLedgerEntry[]
+  settings OrganizationSettings?
+  branches OrganizationBranch[]
+  departments Department[]
+  sections Section[]
+  teams Team[]
+  roles OrganizationRole[]
+  invitations Invitation[]
+  projects Project[]
+  tasks Task[]
+  counters WorkCounter[]
+  taskStatuses TaskStatus[]
+  taskTransitions TaskTransition[]
+  timeEntries TimeEntry[]
+  timers ActiveTimer[]
+  meetings Meeting[]
+  notifications WorkNotification[]
+  notificationPreferences NotificationPreference[]
+  reminderDeliveries ReminderDelivery[]
+  requestTypes InternalRequestType[]
+  requests InternalRequest[]
+  budgets OperationalBudget[]
+  expenses OperationalExpense[]
+  documentFolders DocumentFolder[]
+  documents WorkDocument[]
+  storageUsage OrganizationStorageUsage?
+  workflows Workflow[]
+  workflowEvents WorkflowEvent[]
+  workflowUsage WorkflowMonthlyUsage[]
+  aiSettings AiOrganizationSettings?
+  aiUsage AiMonthlyUsage[]
+  aiWallet AiWallet?
+  aiCredits AiCreditEntry[]
+  aiConversations AiConversation[]
+  aiRequests AiRequest[]
+  aiMessages AiMessage[]
+  aiDrafts AiDraft[]
+  aiAudit AiAudit[]
+  @@map("organizations")
+}
+
+model Membership {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  role           String       @db.VarChar(40)
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  user           User         @relation(fields:[userId],references:[id],onDelete:Restrict)
+  branchId String? @map("branch_id") @db.Uuid
+  departmentId String? @map("department_id") @db.Uuid
+  sectionId String? @map("section_id") @db.Uuid
+  jobTitle String @default("") @map("job_title") @db.VarChar(120)
+  branch OrganizationBranch? @relation("MemberBranch",fields:[organizationId,branchId],references:[organizationId,id],onDelete:Restrict)
+  department Department? @relation("MemberDepartment",fields:[organizationId,departmentId],references:[organizationId,id],onDelete:Restrict)
+  section Section? @relation(fields:[organizationId,sectionId],references:[organizationId,id],onDelete:Restrict)
+  managedBranches OrganizationBranch[] @relation("BranchManager")
+  managedDepartments Department[] @relation("DepartmentManager")
+  ledTeams Team[] @relation("TeamLeader")
+  teams TeamMember[]
+  roles MembershipRole[]
+  invitations Invitation[] @relation("Inviter")
+  timeEntries TimeEntry[]
+  aiConsent AiOrganizationSettings[]
+  billingOrders BillingOrder[]
+  billingEvents BillingEvent[]
+  billingTrials BillingTrialUse[]
+  aiConversations AiConversation[]
+  aiRequests AiRequest[]
+  aiAudit AiAudit[]
+  @@unique([organizationId,id])
+  @@unique([organizationId,id,userId])
+  @@unique([organizationId,userId])
+  @@index([userId,active])
+  @@map("memberships")
+}
+
+model UserSession {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  tokenHash  String   @unique @map("token_hash") @db.VarChar(64)
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+  user       User     @relation(fields:[userId],references:[id],onDelete:Cascade)
+  deviceName String @default("") @map("device_name") @db.VarChar(160)
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  aiRequests AiRequest[]
+  billingOrders BillingOrder[]
+  @@unique([id,userId])
+  @@index([userId,expiresAt])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model AuditLog {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  actorId        String       @map("actor_id") @db.Uuid
+  action         String       @db.VarChar(80)
+  resourceType   String       @map("resource_type") @db.VarChar(80)
+  resourceId     String       @map("resource_id") @db.Uuid
+  requestId      String       @map("request_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@index([organizationId,createdAt])
+  @@index([actorId,createdAt])
+  @@map("audit_logs")
+}
+
+model PlatformRole {
+  id String @id @default(uuid()) @db.Uuid
+  name String @unique @db.VarChar(80)
+  permissions String[]
+  accounts PlatformAccount[]
+  @@map("platform_roles")
+}
+
+model PlatformAccount {
+  id String @id @default(uuid()) @db.Uuid
+  email String @unique @db.VarChar(254)
+  displayName String @map("display_name") @db.VarChar(120)
+  passwordHash String @map("password_hash")
+  isOwner Boolean @default(false) @map("is_owner")
+  disabledAt DateTime? @map("disabled_at") @db.Timestamptz(3)
+  roleId String? @map("role_id") @db.Uuid
+  role PlatformRole? @relation(fields:[roleId],references:[id],onDelete:Restrict)
+  sessions PlatformSession[]
+  aiPromptVersions AiPromptVersion[]
+  aiCreditGrants AiCreditEntry[]
+  billingCoupons BillingCoupon[]
+  billingEvents BillingEvent[]
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@map("platform_accounts")
+}
+
+model PlatformSession {
+  id String @id @default(uuid()) @db.Uuid
+  accountId String @map("account_id") @db.Uuid
+  account PlatformAccount @relation(fields:[accountId],references:[id],onDelete:Cascade)
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  @@index([accountId,expiresAt])
+  @@map("platform_sessions")
+}
+
+model PlatformLoginAttempt {
+  id String @id @default(uuid()) @db.Uuid
+  key String @db.VarChar(64)
+  succeeded Boolean
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([key,createdAt])
+  @@map("platform_login_attempts")
+}
+
+model PlatformAudit {
+  id String @id @default(uuid()) @db.Uuid
+  actorId String? @map("actor_id") @db.Uuid
+  action String @db.VarChar(80)
+  resource String @db.VarChar(80)
+  resourceId String? @map("resource_id") @db.Uuid
+  requestId String @map("request_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([createdAt])
+  @@map("platform_audit")
+}
+
+model PlatformPlan {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique @default(uuid()) @db.VarChar(80)
+  name String @unique @db.VarChar(80)
+  description String @db.VarChar(500)
+  price Decimal @db.Decimal(12,3)
+  currency String @default("OMR") @db.VarChar(3)
+  maxSeats Int @map("max_seats")
+  storageMb Int @map("storage_mb")
+  aiCredits Int @map("ai_credits")
+  automationRuns Int @default(100) @map("automation_runs")
+  activeWorkflows Int @default(5) @map("active_workflows")
+  active Boolean @default(true)
+  annualPrice Decimal? @map("annual_price") @db.Decimal(12,3)
+  maxProjects Int? @map("max_projects")
+  features String[] @default(["TASKS","PROJECTS","CALENDAR","DOCUMENTS","NOTIFICATIONS","AI_BASIC","AUTOMATION","TEAMS","TIME","BUDGETS","ADVANCED_REPORTS","AI_ADVANCED","ADVANCED_PERMISSIONS","PORTFOLIOS","API","INTEGRATIONS","SSO","PRIVATE_HOSTING"])
+  trialDays Int @default(0) @map("trial_days")
+  graceDays Int @default(7) @map("grace_days")
+  customPricing Boolean @default(false) @map("custom_pricing")
+  public Boolean @default(false)
+  version Int @default(1)
+  subscriptions PlatformSubscription[]
+  freeFor BillingSettings[] @relation("BillingFreePlan")
+  trialFor BillingSettings[] @relation("BillingTrialPlan")
+  billingOrders BillingOrder[]
+  billingTrials BillingTrialUse[]
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@map("platform_plans")
+}
+
+model BillingSettings {
+  id String @id @default("main") @db.VarChar(20)
+  freePlanId String? @map("free_plan_id") @db.Uuid
+  freePlan PlatformPlan? @relation("BillingFreePlan",fields:[freePlanId],references:[id],onDelete:Restrict)
+  trialPlanId String? @map("trial_plan_id") @db.Uuid
+  trialPlan PlatformPlan? @relation("BillingTrialPlan",fields:[trialPlanId],references:[id],onDelete:Restrict)
+  trialSeats Int @default(3) @map("trial_seats")
+  manualPaymentsEnabled Boolean @default(false) @map("manual_payments_enabled")
+  paymentInstructions String @default("") @map("payment_instructions") @db.VarChar(4000)
+  supportEmail String @default("") @map("support_email") @db.VarChar(254)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@map("billing_settings")
+}
+model BillingCoupon {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique @db.VarChar(40)
+  name String @db.VarChar(120)
+  kind String @db.VarChar(10)
+  basisPoints Int? @map("basis_points")
+  amount Decimal? @db.Decimal(12,3)
+  startsAt DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt DateTime @map("ends_at") @db.Timestamptz(3)
+  maxUses Int @map("max_uses")
+  perOrganization Int @map("per_organization")
+  allowedPlanIds String[] @map("allowed_plan_ids") @db.Uuid
+  redeemedCount Int @default(0) @map("redeemed_count")
+  reservedCount Int @default(0) @map("reserved_count")
+  active Boolean @default(false)
+  version Int @default(1)
+  createdById String @map("created_by_id") @db.Uuid
+  createdBy PlatformAccount @relation(fields:[createdById],references:[id],onDelete:Restrict)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  orders BillingOrder[]
+  uses BillingCouponUse[]
+  @@index([active,endsAt])
+  @@map("billing_coupons")
+}
+model PlatformSubscription {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  planId String @map("plan_id") @db.Uuid
+  plan PlatformPlan @relation(fields:[planId],references:[id],onDelete:Restrict)
+  status String @db.VarChar(20)
+  seats Int
+  unitPrice Decimal @map("unit_price") @db.Decimal(12,3)
+  endsAt DateTime @map("ends_at") @db.Timestamptz(3)
+  cycle String @default("MONTHLY") @db.VarChar(10)
+  managed Boolean @default(false)
+  periodStart DateTime @default(now()) @map("period_start") @db.Timestamptz(3)
+  usageAnchorAt DateTime @default(now()) @map("usage_anchor_at") @db.Timestamptz(3)
+  anchorDay Int @default(1) @map("anchor_day")
+  cancelAtPeriodEnd Boolean @default(false) @map("cancel_at_period_end")
+  automaticInvoices Boolean @default(false) @map("automatic_invoices")
+  cancellationReason String @default("") @map("cancellation_reason") @db.VarChar(500)
+  canceledAt DateTime? @map("canceled_at") @db.Timestamptz(3)
+  graceEndsAt DateTime? @map("grace_ends_at") @db.Timestamptz(3)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  expectedOrders BillingOrder[] @relation("ExpectedBillingSubscription")
+  appliedOrders BillingOrder[] @relation("AppliedBillingSubscription")
+  billingEvents BillingEvent[]
+  @@unique([organizationId,id])
+  @@index([organizationId,status])
+  @@map("platform_subscriptions")
+}
+
+model PlatformInvoice {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  number String @unique @db.VarChar(80)
+  amount Decimal @db.Decimal(12,3)
+  currency String @default("OMR") @db.VarChar(3)
+  status String @default("ISSUED") @db.VarChar(20)
+  dueAt DateTime @map("due_at") @db.Timestamptz(3)
+  ledger PlatformLedgerEntry[]
+  billingOrderId String? @unique @map("billing_order_id") @db.Uuid
+  billingOrder BillingOrder? @relation(fields:[organizationId,billingOrderId],references:[organizationId,id],onDelete:Restrict)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([organizationId,status])
+  @@unique([organizationId,id])
+  @@unique([organizationId,billingOrderId])
+  @@map("platform_invoices")
+}
+
+model BillingOrder {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  membershipId String @map("membership_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  membership Membership @relation(fields:[organizationId,membershipId,userId],references:[organizationId,id,userId],onDelete:Restrict)
+  sessionId String @map("session_id") @db.Uuid
+  session UserSession @relation(fields:[sessionId,userId],references:[id,userId],onDelete:Restrict)
+  planId String @map("plan_id") @db.Uuid
+  plan PlatformPlan @relation(fields:[planId],references:[id],onDelete:Restrict)
+  expectedSubscriptionId String? @map("expected_subscription_id") @db.Uuid
+  expectedSubscription PlatformSubscription? @relation("ExpectedBillingSubscription",fields:[organizationId,expectedSubscriptionId],references:[organizationId,id],onDelete:Restrict)
+  expectedSubscriptionVersion Int? @map("expected_subscription_version")
+  appliedSubscriptionId String? @map("applied_subscription_id") @db.Uuid
+  appliedSubscription PlatformSubscription? @relation("AppliedBillingSubscription",fields:[organizationId,appliedSubscriptionId],references:[organizationId,id],onDelete:Restrict)
+  kind String @db.VarChar(20)
+  status String @default("QUOTED") @db.VarChar(24)
+  timing String @db.VarChar(16)
+  cycle String @db.VarChar(10)
+  seats Int
+  unitPrice Decimal @map("unit_price") @db.Decimal(12,3)
+  subtotal Decimal @db.Decimal(12,3)
+  discount Decimal @db.Decimal(12,3)
+  totalDue Decimal @map("total_due") @db.Decimal(12,3)
+  renewalTotal Decimal @map("renewal_total") @db.Decimal(12,3)
+  currency String @default("OMR") @db.VarChar(3)
+  couponId String? @map("coupon_id") @db.Uuid
+  coupon BillingCoupon? @relation(fields:[couponId],references:[id],onDelete:Restrict)
+  couponSnapshot Json @default("{}") @map("coupon_snapshot")
+  planSnapshot Json @map("plan_snapshot")
+  effectiveAt DateTime @map("effective_at") @db.Timestamptz(3)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(3)
+  appliedAt DateTime? @map("applied_at") @db.Timestamptz(3)
+  canceledAt DateTime? @map("canceled_at") @db.Timestamptz(3)
+  clientKey String? @map("client_key") @db.Uuid
+  requestHash String? @map("request_hash") @db.VarChar(64)
+  errorCode String? @map("error_code") @db.VarChar(60)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  invoice PlatformInvoice?
+  couponUse BillingCouponUse?
+  events BillingEvent[]
+  @@unique([organizationId,id])
+  @@unique([organizationId,clientKey])
+  @@index([organizationId,status,createdAt])
+  @@index([status,effectiveAt])
+  @@map("billing_orders")
+}
+model BillingCouponUse {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  orderId String @unique @map("order_id") @db.Uuid
+  order BillingOrder @relation(fields:[organizationId,orderId],references:[organizationId,id],onDelete:Restrict)
+  couponId String @map("coupon_id") @db.Uuid
+  coupon BillingCoupon @relation(fields:[couponId],references:[id],onDelete:Restrict)
+  state String @default("RESERVED") @db.VarChar(16)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@unique([organizationId,orderId])
+  @@index([couponId,state])
+  @@index([organizationId,couponId,state])
+  @@map("billing_coupon_uses")
+}
+model BillingEvent {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  membershipId String? @map("membership_id") @db.Uuid
+  membership Membership? @relation(fields:[organizationId,membershipId],references:[organizationId,id],onDelete:Restrict)
+  platformActorId String? @map("platform_actor_id") @db.Uuid
+  platformActor PlatformAccount? @relation(fields:[platformActorId],references:[id],onDelete:Restrict)
+  orderId String? @map("order_id") @db.Uuid
+  order BillingOrder? @relation(fields:[organizationId,orderId],references:[organizationId,id],onDelete:Restrict)
+  subscriptionId String? @map("subscription_id") @db.Uuid
+  subscription PlatformSubscription? @relation(fields:[organizationId,subscriptionId],references:[organizationId,id],onDelete:Restrict)
+  action String @db.VarChar(80)
+  detail Json @default("{}")
+  requestId String @default(uuid()) @map("request_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([organizationId,createdAt])
+  @@map("billing_events")
+}
+model BillingTrialUse {
+  organizationId String @id @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  membershipId String @map("membership_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  membership Membership @relation(fields:[organizationId,membershipId,userId],references:[organizationId,id,userId],onDelete:Restrict)
+  planId String @map("plan_id") @db.Uuid
+  plan PlatformPlan @relation(fields:[planId],references:[id],onDelete:Restrict)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@map("billing_trial_uses")
+}
+model PlatformLedgerEntry {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  invoiceId String? @map("invoice_id") @db.Uuid
+  invoice PlatformInvoice? @relation(fields:[invoiceId],references:[id],onDelete:Restrict)
+  reference String @unique @db.VarChar(100)
+  direction String @db.VarChar(8)
+  amount Decimal @db.Decimal(12,3)
+  currency String @default("OMR") @db.VarChar(3)
+  note String @db.VarChar(500)
+  actorId String @map("actor_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([organizationId,createdAt])
+  @@map("platform_ledger_entries")
+}
+
+model PlatformPage {
+  id String @id @default(uuid()) @db.Uuid
+  slug String @unique @db.VarChar(100)
+  title String @db.VarChar(160)
+  body String @db.Text
+  status String @db.VarChar(20)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@map("platform_pages")
+}
+
+model PlatformSettings {
+  id String @id @default("main") @db.VarChar(10)
+  platformName String @map("platform_name") @db.VarChar(120)
+  supportEmail String @map("support_email") @db.VarChar(254)
+  footerText String @map("footer_text") @db.VarChar(300)
+  maintenanceMode Boolean @default(false) @map("maintenance_mode")
+  publicPagesEnabled Boolean @default(true) @map("public_pages_enabled")
+  sessionMinutes Int @default(60) @map("session_minutes")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@map("platform_settings")
+}
+
+model OrganizationSettings {
+  organizationId String @id @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  description String @default("") @db.VarChar(2000)
+  businessType String @default("") @map("business_type") @db.VarChar(120)
+  email String @default("") @db.VarChar(254)
+  phone String @default("") @db.VarChar(40)
+  address String @default("") @db.VarChar(500)
+  country String @default("OM") @db.VarChar(2)
+  workDays Int[] @default([0,1,2,3,4]) @map("work_days")
+  dayStart String @default("08:00") @map("day_start") @db.VarChar(5)
+  dayEnd String @default("17:00") @map("day_end") @db.VarChar(5)
+  taskPrefix String @default("T") @map("task_prefix") @db.VarChar(10)
+  projectPrefix String @default("P") @map("project_prefix") @db.VarChar(10)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@map("organization_settings")
+}
+
+model OrganizationBranch {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  name String @db.VarChar(120)
+  address String @default("") @db.VarChar(500)
+  managerId String? @map("manager_id") @db.Uuid
+  manager Membership? @relation("BranchManager",fields:[organizationId,managerId],references:[organizationId,id],onDelete:Restrict)
+  members Membership[] @relation("MemberBranch")
+  departments Department[]
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  @@unique([organizationId,id])
+  @@unique([organizationId,name])
+  @@map("organization_branches")
+}
+
+model Department {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  name String @db.VarChar(120)
+  branchId String? @map("branch_id") @db.Uuid
+  branch OrganizationBranch? @relation(fields:[organizationId,branchId],references:[organizationId,id],onDelete:Restrict)
+  managerId String? @map("manager_id") @db.Uuid
+  manager Membership? @relation("DepartmentManager",fields:[organizationId,managerId],references:[organizationId,id],onDelete:Restrict)
+  members Membership[] @relation("MemberDepartment")
+  sections Section[]
+  teams Team[]
+  meetings Meeting[]
+  requests InternalRequest[]
+  tasks Task[]
+  documentFolders DocumentFolder[]
+  documents WorkDocument[]
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  @@unique([organizationId,id])
+  @@unique([organizationId,name])
+  @@index([name(ops: raw("gin_trgm_ops"))],type:Gin,map:"departments_search_name")
+  @@map("departments")
+  workflowTriggers WorkflowTrigger[]
+}
+
+model Section {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  name String @db.VarChar(120)
+  departmentId String @map("department_id") @db.Uuid
+  department Department @relation(fields:[organizationId,departmentId],references:[organizationId,id],onDelete:Restrict)
+  members Membership[]
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  @@unique([organizationId,id])
+  @@unique([organizationId,departmentId,name])
+  @@map("sections")
+}
+
+model Team {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  name String @db.VarChar(120)
+  departmentId String? @map("department_id") @db.Uuid
+  department Department? @relation(fields:[organizationId,departmentId],references:[organizationId,id],onDelete:Restrict)
+  leaderId String? @map("leader_id") @db.Uuid
+  leader Membership? @relation("TeamLeader",fields:[organizationId,leaderId],references:[organizationId,id],onDelete:Restrict)
+  members TeamMember[]
+  meetings Meeting[]
+  tasks Task[]
+  documentFolders DocumentFolder[]
+  documents WorkDocument[]
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  @@unique([organizationId,id])
+  @@unique([organizationId,name])
+  @@map("teams")
+  workflowTriggers WorkflowTrigger[]
+}
+
+model TeamMember {
+  organizationId String @map("organization_id") @db.Uuid
+  teamId String @map("team_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  team Team @relation(fields:[organizationId,teamId],references:[organizationId,id],onDelete:Restrict)
+  membership Membership @relation(fields:[organizationId,membershipId],references:[organizationId,id],onDelete:Restrict)
+  @@id([organizationId,teamId,membershipId])
+  @@index([organizationId,membershipId])
+  @@map("team_members")
+}
+
+model OrganizationRole {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  name String @db.VarChar(80)
+  description String @default("") @db.VarChar(500)
+  permissions OrganizationRolePermission[]
+  memberships MembershipRole[]
+  @@unique([organizationId,id])
+  @@unique([organizationId,name])
+  @@map("organization_roles")
+}
+
+model OrganizationRolePermission {
+  organizationId String @map("organization_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+  permission String @db.VarChar(60)
+  role OrganizationRole @relation(fields:[organizationId,roleId],references:[organizationId,id],onDelete:Restrict)
+  @@id([organizationId,roleId,permission])
+  @@map("organization_role_permissions")
+}
+
+model MembershipRole {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+  scope String @db.VarChar(20)
+  scopeId String? @map("scope_id") @db.Uuid
+  membership Membership @relation(fields:[organizationId,membershipId],references:[organizationId,id],onDelete:Restrict)
+  role OrganizationRole @relation(fields:[organizationId,roleId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,membershipId])
+  @@map("membership_roles")
+}
+
+model Invitation {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  email String @db.VarChar(254)
+  role String @db.VarChar(40)
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  inviterId String @map("inviter_id") @db.Uuid
+  inviter Membership @relation("Inviter",fields:[organizationId,inviterId],references:[organizationId,id],onDelete:Restrict)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([organizationId,email])
+  @@map("invitations")
+}
+
+model UserLoginAttempt {
+  id String @id @default(uuid()) @db.Uuid
+  key String @db.VarChar(64)
+  action String @db.VarChar(30)
+  succeeded Boolean @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([key,action,createdAt])
+  @@map("user_login_attempts")
+}
+
+model UserActionToken {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  purpose String @db.VarChar(30)
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  usedAt DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([userId,purpose])
+  @@map("user_action_tokens")
+}
+
+model EmailOutbox {
+  id String @id @default(uuid()) @db.Uuid
+  recipient String @db.VarChar(254)
+  subject String @db.VarChar(200)
+  textBody String @map("text_body") @db.Text
+  status String @default("PENDING") @db.VarChar(20)
+  attempts Int @default(0)
+  processingAt DateTime? @map("processing_at") @db.Timestamptz(3)
+  sentAt DateTime? @map("sent_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([status,createdAt])
+  @@index([recipient,createdAt])
+  @@map("email_outbox")
+}
+
+model WorkCounter {
+  organizationId String @map("organization_id") @db.Uuid
+  kind String @db.VarChar(20)
+  value Int @default(0)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@id([organizationId,kind])
+  @@map("work_counters")
+}
+model Project {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  number String @db.VarChar(64)
+  aiDrafts AiDraft[] @relation("AiCreatedProject")
+  name String @db.VarChar(180)
+  description String @default("")
+  objective String @default("")
+  branchId String? @map("branch_id") @db.Uuid
+  departmentId String? @map("department_id") @db.Uuid
+  teamId String? @map("team_id") @db.Uuid
+  managerId String @map("manager_id") @db.Uuid
+  createdById String @map("created_by_id") @db.Uuid
+  client String @default("") @db.VarChar(180)
+  category String @default("") @db.VarChar(80)
+  status String @default("PLANNED") @db.VarChar(30)
+  priority String @default("NORMAL") @db.VarChar(20)
+  startDate DateTime? @map("start_date") @db.Timestamptz(3)
+  endDate DateTime? @map("end_date") @db.Timestamptz(3)
+  budget Decimal @default(0) @db.Decimal(18,3)
+  version Int @default(1)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  members ProjectMember[]
+  phases ProjectPhase[]
+  milestones ProjectMilestone[]
+  risks ProjectRisk[]
+  decisions ProjectDecision[]
+  tasks Task[]
+  meetings Meeting[]
+  budgets OperationalBudget[]
+  expenses OperationalExpense[]
+  documentFolders DocumentFolder[]
+  documents WorkDocument[]
+  documentLinks DocumentLink[]
+  @@unique([organizationId,id])
+  @@unique([organizationId,number])
+  @@index([organizationId,archivedAt,status,endDate])
+  @@index([name(ops: raw("gin_trgm_ops"))],type:Gin,map:"projects_search_name")
+  @@index([number(ops: raw("gin_trgm_ops"))],type:Gin,map:"projects_search_number")
+  @@map("projects")
+  workflowTriggers WorkflowTrigger[]
+}
+model ProjectMember {
+  organizationId String @map("organization_id") @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  project Project @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict)
+  @@id([organizationId,projectId,membershipId])
+  @@map("project_members")
+}
+model ProjectPhase {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+  name String @db.VarChar(180)
+  position Int @default(0)
+  project Project @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict)
+  @@unique([organizationId,id])
+  @@index([organizationId,projectId,position])
+  @@map("project_phases")
+}
+model ProjectMilestone {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+  name String @db.VarChar(180)
+  dueDate DateTime @map("due_date") @db.Timestamptz(3)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(3)
+  project Project @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,projectId,dueDate])
+  @@map("project_milestones")
+}
+model ProjectRisk {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+  title String @db.VarChar(180)
+  description String @default("")
+  likelihood Int
+  impact Int
+  mitigation String @default("")
+  ownerId String @map("owner_id") @db.Uuid
+  status String @default("OPEN") @db.VarChar(20)
+  project Project @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,projectId])
+  @@map("project_risks")
+}
+model ProjectDecision {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+  title String @db.VarChar(180)
+  body String
+  createdById String @map("created_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  project Project @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,projectId,createdAt])
+  @@map("project_decisions")
+}
+model TaskStatus {
+  organizationId String @map("organization_id") @db.Uuid
+  key String @db.VarChar(40)
+  nameAr String @map("name_ar") @db.VarChar(80)
+  nameEn String @map("name_en") @db.VarChar(80)
+  category String @db.VarChar(20)
+  position Int
+  active Boolean @default(true)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@id([organizationId,key])
+  @@map("task_statuses")
+}
+model TaskTransition {
+  organizationId String @map("organization_id") @db.Uuid
+  fromStatus String @map("from_status") @db.VarChar(40)
+  toStatus String @map("to_status") @db.VarChar(40)
+  permission String @db.VarChar(60)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@id([organizationId,fromStatus,toStatus])
+  @@map("task_transitions")
+}
+model Task {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  number String @db.VarChar(64)
+  aiDrafts AiDraft[] @relation("AiCreatedTask")
+  title String @db.VarChar(180)
+  description String @default("")
+  departmentId String? @map("department_id") @db.Uuid
+  teamId String? @map("team_id") @db.Uuid
+  projectId String? @map("project_id") @db.Uuid
+  phaseId String? @map("phase_id") @db.Uuid
+  parentTaskId String? @map("parent_task_id") @db.Uuid
+  createdById String @map("created_by_id") @db.Uuid
+  assignedToId String? @map("assigned_to_id") @db.Uuid
+  reviewerId String? @map("reviewer_id") @db.Uuid
+  approverId String? @map("approver_id") @db.Uuid
+  startDate DateTime? @map("start_date") @db.Timestamptz(3)
+  dueDate DateTime? @map("due_date") @db.Timestamptz(3)
+  priority String @default("NORMAL") @db.VarChar(20)
+  status String @default("NEW") @db.VarChar(40)
+  progress Int @default(0)
+  estimatedHours Decimal @default(0) @map("estimated_hours") @db.Decimal(10,2)
+  costEstimate Decimal @default(0) @map("cost_estimate") @db.Decimal(18,3)
+  tags String[]
+  category String @default("") @db.VarChar(80)
+  visibility String @default("PRIVATE") @db.VarChar(20)
+  confidentiality String @default("INTERNAL") @db.VarChar(20)
+  recurrence String @default("NONE") @db.VarChar(20)
+  recurrenceUntil DateTime? @map("recurrence_until") @db.Timestamptz(3)
+  reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz(3)
+  approvedAt DateTime? @map("approved_at") @db.Timestamptz(3)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(3)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  project Project? @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict)
+  department Department? @relation(fields:[organizationId,departmentId],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction,map:"tasks_department")
+  team Team? @relation(fields:[organizationId,teamId],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction,map:"tasks_team")
+  participants TaskParticipant[]
+  checklist TaskChecklistItem[]
+  comments TaskComment[]
+  dependencies TaskDependency[] @relation("TaskDependencies")
+  dependents TaskDependency[] @relation("TaskDependents")
+  changes TaskChange[]
+  timeEntries TimeEntry[]
+  expenses OperationalExpense[]
+  documentLinks DocumentLink[]
+  @@unique([organizationId,id])
+  @@unique([organizationId,number])
+  @@index([organizationId,archivedAt,status,dueDate])
+  @@index([organizationId,assignedToId,status])
+  @@index([organizationId,projectId])
+  @@index([title(ops: raw("gin_trgm_ops"))],type:Gin,map:"tasks_search_title")
+  @@index([number(ops: raw("gin_trgm_ops"))],type:Gin,map:"tasks_search_number")
+  @@map("tasks")
+}
+model TaskParticipant {
+  organizationId String @map("organization_id") @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  task Task @relation(fields:[organizationId,taskId],references:[organizationId,id],onDelete:Restrict)
+  @@id([organizationId,taskId,membershipId])
+  @@map("task_participants")
+}
+model TaskChecklistItem {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  title String @db.VarChar(300)
+  completed Boolean @default(false)
+  position Int @default(0)
+  task Task @relation(fields:[organizationId,taskId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,taskId,position])
+  @@map("task_checklist_items")
+}
+model TaskComment {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  authorId String @map("author_id") @db.Uuid
+  body String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  task Task @relation(fields:[organizationId,taskId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,taskId,createdAt])
+  @@map("task_comments")
+}
+model TaskDependency {
+  organizationId String @map("organization_id") @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  predecessorId String @map("predecessor_id") @db.Uuid
+  task Task @relation("TaskDependencies",fields:[organizationId,taskId],references:[organizationId,id],onDelete:Restrict)
+  predecessor Task @relation("TaskDependents",fields:[organizationId,predecessorId],references:[organizationId,id],onDelete:Restrict)
+  @@id([organizationId,taskId,predecessorId])
+  @@map("task_dependencies")
+}
+model TaskChange {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  action String @db.VarChar(60)
+  detail Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  task Task @relation(fields:[organizationId,taskId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,taskId,createdAt])
+  @@map("task_changes")
+}
+
+model TimeEntry {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  projectId String? @map("project_id") @db.Uuid
+  startedAt DateTime @map("started_at") @db.Timestamptz(3)
+  endedAt DateTime @map("ended_at") @db.Timestamptz(3)
+  durationSeconds Int @map("duration_seconds")
+  description String @default("") @db.VarChar(2000)
+  source String @db.VarChar(10)
+  createdById String @map("created_by_id") @db.Uuid
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  task Task @relation(fields:[organizationId,taskId],references:[organizationId,id],onDelete:Restrict,map:"time_entries_task_id")
+  membership Membership @relation(fields:[organizationId,membershipId],references:[organizationId,id],onDelete:Restrict,map:"time_entries_membership_id")
+  @@index([organizationId,membershipId,startedAt])
+  @@index([organizationId,taskId])
+  @@index([organizationId,projectId])
+  @@map("time_entries")
+}
+model ActiveTimer {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  startedAt DateTime @default(now()) @map("started_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@unique([organizationId,membershipId])
+  @@map("active_timers")
+}
+model Meeting {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  projectId String? @map("project_id") @db.Uuid
+  departmentId String? @map("department_id") @db.Uuid
+  teamId String? @map("team_id") @db.Uuid
+  title String @db.VarChar(180)
+  description String @default("")
+  startsAt DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt DateTime @map("ends_at") @db.Timestamptz(3)
+  location String @default("") @db.VarChar(300)
+  meetingUrl String @default("") @map("meeting_url") @db.VarChar(1000)
+  chairId String @map("chair_id") @db.Uuid
+  createdById String @map("created_by_id") @db.Uuid
+  approverId String? @map("approver_id") @db.Uuid
+  agenda String @default("")
+  minutes String @default("")
+  minutesAuthorId String? @map("minutes_author_id") @db.Uuid
+  recommendations String @default("")
+  status String @default("DRAFT") @db.VarChar(30)
+  approvedAt DateTime? @map("approved_at") @db.Timestamptz(3)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  project Project? @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict,map:"meetings_project_id")
+  department Department? @relation(fields:[organizationId,departmentId],references:[organizationId,id],onDelete:Restrict,map:"meetings_department_id")
+  team Team? @relation(fields:[organizationId,teamId],references:[organizationId,id],onDelete:Restrict,map:"meetings_team_id")
+  attendees MeetingAttendee[]
+  decisions MeetingDecision[]
+  revisions MeetingRevision[]
+  documentLinks DocumentLink[]
+  @@unique([organizationId,id])
+  @@index([organizationId,startsAt])
+  @@index([title(ops: raw("gin_trgm_ops"))],type:Gin,map:"meetings_search_title")
+  @@map("meetings")
+}
+model MeetingAttendee {
+  organizationId String @map("organization_id") @db.Uuid
+  meetingId String @map("meeting_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  response String @default("INVITED") @db.VarChar(20)
+  meeting Meeting @relation(fields:[organizationId,meetingId],references:[organizationId,id],onDelete:Restrict)
+  @@id([organizationId,meetingId,membershipId])
+  @@map("meeting_attendees")
+}
+model MeetingDecision {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  meetingId String @map("meeting_id") @db.Uuid
+  title String @db.VarChar(180)
+  details String @default("")
+  responsibleId String @map("responsible_id") @db.Uuid
+  dueDate DateTime? @map("due_date") @db.Timestamptz(3)
+  taskId String? @unique @map("task_id") @db.Uuid
+  meeting Meeting @relation(fields:[organizationId,meetingId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,meetingId])
+  @@map("meeting_decisions")
+}
+model MeetingRevision {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  meetingId String @map("meeting_id") @db.Uuid
+  version Int
+  snapshot Json
+  savedById String @map("saved_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  meeting Meeting @relation(fields:[organizationId,meetingId],references:[organizationId,id],onDelete:Restrict)
+  @@unique([organizationId,meetingId,version])
+  @@map("meeting_revisions")
+}
+model WorkNotification {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  kind String @db.VarChar(60)
+  resourceType String @map("resource_type") @db.VarChar(30)
+  resourceId String @map("resource_id") @db.Uuid
+  deduplicationKey String @map("deduplication_key") @db.VarChar(200)
+  readAt DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@unique([organizationId,membershipId,deduplicationKey])
+  @@index([organizationId,membershipId,readAt,createdAt])
+  @@map("work_notifications")
+}
+model NotificationPreference {
+  organizationId String @map("organization_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  inAppEnabled Boolean @default(true) @map("in_app_enabled")
+  emailEnabled Boolean @default(false) @map("email_enabled")
+  remindersEnabled Boolean @default(true) @map("reminders_enabled")
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@id([organizationId,membershipId])
+  @@map("notification_preferences")
+}
+model ReminderDelivery {
+  organizationId String @map("organization_id") @db.Uuid
+  resourceType String @map("resource_type") @db.VarChar(30)
+  resourceId String @map("resource_id") @db.Uuid
+  dueAt DateTime @map("due_at") @db.Timestamptz(3)
+  stage String @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@id([organizationId,resourceType,resourceId,dueAt,stage])
+  @@map("reminder_deliveries")
+}
+model InternalRequestType {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  name String @db.VarChar(120)
+  description String @default("")
+  fields Json
+  active Boolean @default(true)
+  version Int @default(1)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  steps RequestTypeApprovalStep[]
+  requests InternalRequest[]
+  @@unique([organizationId,id])
+  @@unique([organizationId,name])
+  @@map("internal_request_types")
+}
+model RequestTypeApprovalStep {
+  organizationId String @map("organization_id") @db.Uuid
+  requestTypeId String @map("request_type_id") @db.Uuid
+  position Int
+  approverId String @map("approver_id") @db.Uuid
+  type InternalRequestType @relation(fields:[organizationId,requestTypeId],references:[organizationId,id],onDelete:Restrict)
+  @@id([organizationId,requestTypeId,position])
+  @@map("request_type_approval_steps")
+}
+model InternalRequest {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  number String @db.VarChar(64)
+  requestTypeId String @map("request_type_id") @db.Uuid
+  templateSnapshot Json @map("template_snapshot")
+  title String @db.VarChar(180)
+  details String @default("")
+  answers Json
+  requesterId String @map("requester_id") @db.Uuid
+  departmentId String? @map("department_id") @db.Uuid
+  responsibleId String? @map("responsible_id") @db.Uuid
+  priority String @default("NORMAL") @db.VarChar(20)
+  dueDate DateTime? @map("due_date") @db.Timestamptz(3)
+  status String @default("DRAFT") @db.VarChar(20)
+  version Int @default(1)
+  approvalRound Int @default(0) @map("approval_round")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  type InternalRequestType @relation(fields:[organizationId,requestTypeId],references:[organizationId,id],onDelete:Restrict)
+  department Department? @relation(fields:[organizationId,departmentId],references:[organizationId,id],onDelete:Restrict,map:"internal_requests_department_id")
+  approvals RequestApproval[]
+  events InternalRequestEvent[]
+  documentLinks DocumentLink[]
+  @@unique([organizationId,id])
+  @@unique([organizationId,number])
+  @@index([organizationId,requesterId,status])
+  @@index([title(ops: raw("gin_trgm_ops"))],type:Gin,map:"requests_search_title")
+  @@index([number(ops: raw("gin_trgm_ops"))],type:Gin,map:"requests_search_number")
+  @@map("internal_requests")
+}
+model RequestApproval {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  requestId String @map("request_id") @db.Uuid
+  position Int
+  round Int @default(1)
+  approverId String @map("approver_id") @db.Uuid
+  status String @default("PENDING") @db.VarChar(20)
+  reason String @default("")
+  decidedAt DateTime? @map("decided_at") @db.Timestamptz(3)
+  request InternalRequest @relation(fields:[organizationId,requestId],references:[organizationId,id],onDelete:Restrict)
+  @@unique([organizationId,requestId,round,position])
+  @@index([organizationId,approverId,status])
+  @@map("request_approvals")
+}
+model OperationalBudget {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  projectId String? @map("project_id") @db.Uuid
+  name String @db.VarChar(180)
+  currency String @default("OMR") @db.VarChar(3)
+  amount Decimal @db.Decimal(18,3)
+  startsAt DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt DateTime @map("ends_at") @db.Timestamptz(3)
+  version Int @default(1)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  project Project? @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction,map:"operational_budgets_project_id")
+  expenses OperationalExpense[]
+  events BudgetEvent[]
+  @@unique([organizationId,id])
+  @@index([organizationId,projectId])
+  @@index([name(ops: raw("gin_trgm_ops"))],type:Gin,map:"budgets_search_name")
+  @@map("operational_budgets")
+}
+model InternalRequestEvent {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  requestId String @map("request_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  action String @db.VarChar(40)
+  detail Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  request InternalRequest @relation(fields:[organizationId,requestId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,requestId,createdAt])
+  @@map("internal_request_events")
+}
+model OperationalExpense {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  projectId String? @map("project_id") @db.Uuid
+  taskId String? @map("task_id") @db.Uuid
+  budgetId String? @map("budget_id") @db.Uuid
+  title String @db.VarChar(180)
+  supplier String @default("") @db.VarChar(180)
+  category String @default("") @db.VarChar(80)
+  currency String @db.VarChar(3)
+  amount Decimal @db.Decimal(18,3)
+  exchangeRate Decimal @map("exchange_rate") @db.Decimal(20,9)
+  rateSource String @map("rate_source") @db.VarChar(300)
+  rateDate DateTime @map("rate_date") @db.Timestamptz(3)
+  baseCurrency String @default("OMR") @map("base_currency") @db.VarChar(3)
+  baseAmount Decimal @map("base_amount") @db.Decimal(18,3)
+  expenseDate DateTime @map("expense_date") @db.Timestamptz(3)
+  requesterId String @map("requester_id") @db.Uuid
+  approverId String @map("approver_id") @db.Uuid
+  status String @default("DRAFT") @db.VarChar(20)
+  reason String @default("")
+  decidedAt DateTime? @map("decided_at") @db.Timestamptz(3)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  project Project? @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction,map:"operational_expenses_project_id")
+  task Task? @relation(fields:[organizationId,taskId],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction,map:"operational_expenses_task_id")
+  budget OperationalBudget? @relation(fields:[organizationId,budgetId],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction,map:"operational_expenses_budget_id")
+  events ExpenseEvent[]
+  documentLinks DocumentLink[]
+  @@unique([organizationId,id])
+  @@index([organizationId,projectId,status])
+  @@index([organizationId,requesterId,status])
+  @@index([title(ops: raw("gin_trgm_ops"))],type:Gin,map:"expenses_search_title")
+  @@map("operational_expenses")
+  @@index([organizationId,budgetId,status],map:"operational_expenses_budget_status")
+}
+model BudgetEvent {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  budgetId String @map("budget_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  action String @db.VarChar(40)
+  detail Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  budget OperationalBudget @relation(fields:[organizationId,budgetId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,budgetId,createdAt])
+  @@map("budget_events")
+}
+model ExpenseEvent {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  expenseId String @map("expense_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  action String @db.VarChar(40)
+  detail Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  expense OperationalExpense @relation(fields:[organizationId,expenseId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,expenseId,createdAt])
+  @@map("expense_events")
+}
+
+model DocumentFolder {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  parentId String? @map("parent_id") @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  projectId String? @map("project_id") @db.Uuid
+  departmentId String? @map("department_id") @db.Uuid
+  teamId String? @map("team_id") @db.Uuid
+  name String @db.VarChar(180)
+  visibility String @default("PRIVATE") @db.VarChar(20)
+  version Int @default(1)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  parent DocumentFolder? @relation("FolderTree",fields:[organizationId,parentId],references:[organizationId,id],onDelete:Restrict)
+  children DocumentFolder[] @relation("FolderTree")
+  project Project? @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict)
+  department Department? @relation(fields:[organizationId,departmentId],references:[organizationId,id],onDelete:Restrict)
+  team Team? @relation(fields:[organizationId,teamId],references:[organizationId,id],onDelete:Restrict)
+  documents WorkDocument[]
+  ancestors FolderClosure[] @relation("FolderDescendant")
+  descendants FolderClosure[] @relation("FolderAncestor")
+  shares FolderShare[]
+  events FolderEvent[]
+  @@unique([organizationId,id])
+  @@index([organizationId,parentId,archivedAt])
+  @@map("document_folders")
+}
+model FolderClosure {
+  organizationId String @map("organization_id") @db.Uuid
+  ancestorId String @map("ancestor_id") @db.Uuid
+  descendantId String @map("descendant_id") @db.Uuid
+  depth Int
+  ancestor DocumentFolder @relation("FolderAncestor",fields:[organizationId,ancestorId],references:[organizationId,id],onDelete:Restrict)
+  descendant DocumentFolder @relation("FolderDescendant",fields:[organizationId,descendantId],references:[organizationId,id],onDelete:Restrict)
+  @@id([organizationId,ancestorId,descendantId])
+  @@index([organizationId,descendantId,depth])
+  @@map("folder_closure")
+}
+model FolderShare {
+  organizationId String @map("organization_id") @db.Uuid
+  folderId String @map("folder_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  permission String @db.VarChar(10)
+  folder DocumentFolder @relation(fields:[organizationId,folderId],references:[organizationId,id],onDelete:Restrict)
+  @@id([organizationId,folderId,membershipId])
+  @@map("folder_shares")
+}
+model WorkDocument {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  folderId String? @map("folder_id") @db.Uuid
+  projectId String? @map("project_id") @db.Uuid
+  departmentId String? @map("department_id") @db.Uuid
+  teamId String? @map("team_id") @db.Uuid
+  title String @db.VarChar(180)
+  category String @default("") @db.VarChar(80)
+  tags String[]
+  visibility String @default("PRIVATE") @db.VarChar(20)
+  confidentiality String @default("INTERNAL") @db.VarChar(20)
+  status String @default("PENDING") @db.VarChar(20)
+  currentVersionId String? @map("current_version_id") @db.Uuid
+  version Int @default(1)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  folder DocumentFolder? @relation(fields:[organizationId,folderId],references:[organizationId,id],onDelete:Restrict)
+  project Project? @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict)
+  department Department? @relation(fields:[organizationId,departmentId],references:[organizationId,id],onDelete:Restrict)
+  team Team? @relation(fields:[organizationId,teamId],references:[organizationId,id],onDelete:Restrict)
+  currentVersion DocumentVersion? @relation("CurrentDocumentVersion",fields:[organizationId,id,currentVersionId],references:[organizationId,documentId,id],onDelete:Restrict,map:"document_current_version")
+  versions DocumentVersion[] @relation("DocumentVersions")
+  shares DocumentShare[]
+  links DocumentLink[]
+  comments DocumentComment[]
+  events DocumentEvent[]
+  @@unique([organizationId,id])
+  @@index([organizationId,folderId,archivedAt,status])
+  @@index([organizationId,ownerId])
+  @@index([title(ops: raw("gin_trgm_ops"))],type:Gin,map:"documents_search_title")
+  @@map("work_documents")
+}
+model DocumentVersion {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  number Int
+  filename String @db.VarChar(200)
+  mime String @db.VarChar(120)
+  bytes BigInt
+  sha256 String @db.VarChar(64)
+  objectKey String @unique @map("object_key") @db.VarChar(200)
+  status String @default("PENDING") @db.VarChar(20)
+  scanStatus String @default("NOT_SCANNED") @map("scan_status") @db.VarChar(20)
+  uploadedById String @map("uploaded_by_id") @db.Uuid
+  uploadRequestId String @map("upload_request_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  document WorkDocument @relation("DocumentVersions",fields:[organizationId,documentId],references:[organizationId,id],onDelete:Restrict)
+  currentFor WorkDocument[] @relation("CurrentDocumentVersion")
+  cleanupJob BlobCleanupJob?
+  @@unique([organizationId,id])
+  @@unique([organizationId,uploadRequestId])
+  @@unique([organizationId,documentId,id])
+  @@unique([organizationId,documentId,number])
+  @@index([status,createdAt])
+  @@map("document_versions")
+}
+model DocumentShare {
+  organizationId String @map("organization_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  permission String @db.VarChar(10)
+  document WorkDocument @relation(fields:[organizationId,documentId],references:[organizationId,id],onDelete:Restrict)
+  @@id([organizationId,documentId,membershipId])
+  @@map("document_shares")
+}
+model DocumentLink {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  projectId String? @map("project_id") @db.Uuid
+  taskId String? @map("task_id") @db.Uuid
+  meetingId String? @map("meeting_id") @db.Uuid
+  requestId String? @map("request_id") @db.Uuid
+  expenseId String? @map("expense_id") @db.Uuid
+  document WorkDocument @relation(fields:[organizationId,documentId],references:[organizationId,id],onDelete:Restrict)
+  project Project? @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict)
+  task Task? @relation(fields:[organizationId,taskId],references:[organizationId,id],onDelete:Restrict)
+  meeting Meeting? @relation(fields:[organizationId,meetingId],references:[organizationId,id],onDelete:Restrict)
+  request InternalRequest? @relation(fields:[organizationId,requestId],references:[organizationId,id],onDelete:Restrict)
+  expense OperationalExpense? @relation(fields:[organizationId,expenseId],references:[organizationId,id],onDelete:Restrict)
+  @@unique([organizationId,documentId,projectId])
+  @@unique([organizationId,documentId,taskId])
+  @@unique([organizationId,documentId,meetingId])
+  @@unique([organizationId,documentId,requestId])
+  @@unique([organizationId,documentId,expenseId])
+  @@index([organizationId,taskId])
+  @@index([organizationId,meetingId])
+  @@map("document_links")
+}
+model OrganizationStorageUsage {
+  organizationId String @id @map("organization_id") @db.Uuid
+  usedBytes BigInt @default(0) @map("used_bytes")
+  reservedBytes BigInt @default(0) @map("reserved_bytes")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@map("organization_storage_usage")
+}
+model DocumentComment {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  body String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  document WorkDocument @relation(fields:[organizationId,documentId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,documentId,createdAt])
+  @@map("document_comments")
+}
+model DocumentEvent {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  action String @db.VarChar(40)
+  detail Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  document WorkDocument @relation(fields:[organizationId,documentId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,documentId,createdAt])
+  @@map("document_events")
+}
+model FolderEvent {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  folderId String @map("folder_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  action String @db.VarChar(40)
+  detail Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  folder DocumentFolder @relation(fields:[organizationId,folderId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,folderId,createdAt])
+  @@map("folder_events")
+}
+model BlobCleanupJob {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  versionId String @unique @map("version_id") @db.Uuid
+  status String @default("PENDING") @db.VarChar(20)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  lockedAt DateTime? @map("locked_at") @db.Timestamptz(3)
+  released Boolean @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  version DocumentVersion @relation(fields:[organizationId,versionId],references:[organizationId,id],onDelete:Restrict)
+  @@unique([organizationId,versionId])
+  @@index([status,nextAttemptAt])
+  @@map("blob_cleanup_jobs")
+}
+model Workflow {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  activatedById String? @map("activated_by_id") @db.Uuid
+  activatedAt DateTime? @map("activated_at") @db.Timestamptz(3)
+  nextScheduleAt DateTime? @map("next_schedule_at") @db.Timestamptz(3)
+  scheduleCursor String? @map("schedule_cursor") @db.Uuid
+  name String @db.VarChar(180)
+  description String @default("")
+  status String @default("DRAFT") @db.VarChar(20)
+  version Int @default(1)
+  currentRevisionId String? @map("current_revision_id") @db.Uuid
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  currentRevision WorkflowRevision? @relation("CurrentWorkflowRevision",fields:[organizationId,id,currentRevisionId],references:[organizationId,workflowId,id],onDelete:Restrict)
+  revisions WorkflowRevision[] @relation("WorkflowRevisions")
+  runs WorkflowRun[]
+  scheduledEvents WorkflowEvent[] @relation("WorkflowTarget")
+  @@unique([organizationId,id])
+  @@index([organizationId,status])
+  @@index([name(ops: raw("gin_trgm_ops"))],type:Gin,map:"workflows_search_name")
+  @@map("workflows")
+}
+model WorkflowRevision {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  workflowId String @map("workflow_id") @db.Uuid
+  number Int
+  name String @db.VarChar(180)
+  description String
+  graph Json
+  createdById String @map("created_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  workflow Workflow @relation("WorkflowRevisions",fields:[organizationId,workflowId],references:[organizationId,id],onDelete:Restrict)
+  currentFor Workflow[] @relation("CurrentWorkflowRevision")
+  trigger WorkflowTrigger?
+  nodes WorkflowNode[]
+  runs WorkflowRun[]
+  @@unique([organizationId,id])
+  @@unique([organizationId,workflowId,id])
+  @@unique([organizationId,workflowId,number])
+  @@map("workflow_revisions")
+}
+model WorkflowTrigger {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  revisionId String @unique @map("revision_id") @db.Uuid
+  kind String @db.VarChar(40)
+  projectId String? @map("project_id") @db.Uuid
+  departmentId String? @map("department_id") @db.Uuid
+  teamId String? @map("team_id") @db.Uuid
+  hours Decimal @default(24) @db.Decimal(10,3)
+  thresholdPercent Decimal @default(20) @map("threshold_percent") @db.Decimal(7,3)
+  revision WorkflowRevision @relation(fields:[organizationId,revisionId],references:[organizationId,id],onDelete:Restrict)
+  project Project? @relation(fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict)
+  department Department? @relation(fields:[organizationId,departmentId],references:[organizationId,id],onDelete:Restrict)
+  team Team? @relation(fields:[organizationId,teamId],references:[organizationId,id],onDelete:Restrict)
+  @@unique([organizationId,revisionId])
+  @@index([kind])
+  @@map("workflow_triggers")
+}
+model WorkflowNode {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  revisionId String @map("revision_id") @db.Uuid
+  nodeKey String @map("node_key") @db.Uuid
+  name String @db.VarChar(120)
+  kind String @db.VarChar(20)
+  nextKey String? @map("next_key") @db.Uuid
+  yesKey String? @map("yes_key") @db.Uuid
+  noKey String? @map("no_key") @db.Uuid
+  delaySeconds Int? @map("delay_seconds")
+  revision WorkflowRevision @relation(fields:[organizationId,revisionId],references:[organizationId,id],onDelete:Restrict)
+  condition WorkflowCondition?
+  action WorkflowAction?
+  runs WorkflowRun[] @relation("RunCurrentNode")
+  @@unique([organizationId,revisionId,nodeKey])
+  @@map("workflow_nodes")
+}
+model WorkflowCondition {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  revisionId String @map("revision_id") @db.Uuid
+  nodeKey String @map("node_key") @db.Uuid
+  predicate Json
+  node WorkflowNode @relation(fields:[organizationId,revisionId,nodeKey],references:[organizationId,revisionId,nodeKey],onDelete:Restrict)
+  @@unique([organizationId,revisionId,nodeKey])
+  @@map("workflow_conditions")
+}
+model WorkflowAction {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  revisionId String @map("revision_id") @db.Uuid
+  nodeKey String @map("node_key") @db.Uuid
+  type String @db.VarChar(30)
+  parameters Json
+  node WorkflowNode @relation(fields:[organizationId,revisionId,nodeKey],references:[organizationId,revisionId,nodeKey],onDelete:Restrict)
+  @@unique([organizationId,revisionId,nodeKey])
+  @@map("workflow_actions")
+}
+model WorkflowEvent {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  kind String @db.VarChar(40)
+  resourceType String @map("resource_type") @db.VarChar(20)
+  resourceId String @map("resource_id") @db.Uuid
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  targetWorkflowId String? @map("target_workflow_id") @db.Uuid
+  chainId String @map("chain_id") @db.Uuid
+  depth Int @default(0)
+  dedupeKey String @map("dedupe_key") @db.VarChar(200)
+  snapshot Json
+  status String @default("PENDING") @db.VarChar(20)
+  attempts Int @default(0)
+  leaseToken String? @map("lease_token") @db.Uuid
+  leaseUntil DateTime? @map("lease_until") @db.Timestamptz(3)
+  nextAttemptAt DateTime @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  targetWorkflow Workflow? @relation("WorkflowTarget",fields:[organizationId,targetWorkflowId],references:[organizationId,id],onDelete:Restrict)
+  runs WorkflowRun[]
+  @@unique([organizationId,id])
+  @@unique([organizationId,dedupeKey])
+  @@index([status,nextAttemptAt])
+  @@map("workflow_events")
+}
+model WorkflowRun {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  workflowId String @map("workflow_id") @db.Uuid
+  revisionId String @map("revision_id") @db.Uuid
+  eventId String @map("event_id") @db.Uuid
+  chainId String @map("chain_id") @db.Uuid
+  executorId String @map("executor_id") @db.Uuid
+  currentNodeKey String @map("current_node_key") @db.Uuid
+  status String @default("PENDING") @db.VarChar(20)
+  nextRunAt DateTime @default(now()) @map("next_run_at") @db.Timestamptz(3)
+  leaseToken String? @map("lease_token") @db.Uuid
+  leaseUntil DateTime? @map("lease_until") @db.Timestamptz(3)
+  attempts Int @default(0)
+  steps Int @default(0)
+  errorCode String? @map("error_code") @db.VarChar(60)
+  charged Boolean @default(false)
+  startedAt DateTime? @map("started_at") @db.Timestamptz(3)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  workflow Workflow @relation(fields:[organizationId,workflowId],references:[organizationId,id],onDelete:Restrict)
+  revision WorkflowRevision @relation(fields:[organizationId,workflowId,revisionId],references:[organizationId,workflowId,id],onDelete:Restrict)
+  event WorkflowEvent @relation(fields:[organizationId,eventId],references:[organizationId,id],onDelete:Restrict)
+  currentNode WorkflowNode @relation("RunCurrentNode",fields:[organizationId,revisionId,currentNodeKey],references:[organizationId,revisionId,nodeKey],onDelete:Restrict)
+  logs WorkflowExecutionLog[]
+  receipts WorkflowActionReceipt[]
+  @@unique([organizationId,id])
+  @@unique([organizationId,workflowId,eventId])
+  @@unique([organizationId,workflowId,chainId])
+  @@index([status,nextRunAt])
+  @@map("workflow_runs")
+}
+model WorkflowExecutionLog {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  runId String @map("run_id") @db.Uuid
+  nodeKey String? @map("node_key") @db.Uuid
+  actorId String? @map("actor_id") @db.Uuid
+  kind String @db.VarChar(30)
+  detail Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  run WorkflowRun @relation(fields:[organizationId,runId],references:[organizationId,id],onDelete:Restrict)
+  @@index([organizationId,runId,createdAt])
+  @@map("workflow_execution_logs")
+}
+model WorkflowActionReceipt {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  runId String @map("run_id") @db.Uuid
+  nodeKey String @map("node_key") @db.Uuid
+  outcome Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  run WorkflowRun @relation(fields:[organizationId,runId],references:[organizationId,id],onDelete:Restrict)
+  @@unique([organizationId,runId,nodeKey])
+  @@map("workflow_action_receipts")
+}
+model WorkflowMonthlyUsage {
+  organizationId String @map("organization_id") @db.Uuid
+  periodStart DateTime @map("period_start") @db.Timestamptz(3)
+  executions Int @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@id([organizationId,periodStart])
+  @@map("workflow_monthly_usage")
+}
+
+model AiProvider {
+ id String @id @default(uuid()) @db.Uuid
+ name String @unique @db.VarChar(120)
+ kind String @db.VarChar(30)
+ encryptedKey String @map("encrypted_key")
+ endpointHash String @map("endpoint_hash") @db.VarChar(64)
+ endpointHost String @map("endpoint_host") @db.VarChar(253)
+ active Boolean @default(false)
+ monthlyBudgetUsd Decimal @map("monthly_budget_usd") @db.Decimal(18,9)
+ maxConcurrent Int @default(4) @map("max_concurrent")
+ version Int @default(1)
+ models AiModel[]
+ usage AiProviderMonthlyUsage[]
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+ @@map("ai_providers")
+}
+model AiModel {
+ id String @id @default(uuid()) @db.Uuid
+ providerId String @map("provider_id") @db.Uuid
+ name String @db.VarChar(120)
+ identifier String @db.VarChar(160)
+ active Boolean @default(false)
+ inputPriceUsd Decimal @map("input_price_usd") @db.Decimal(18,9)
+ cachedInputPriceUsd Decimal @map("cached_input_price_usd") @db.Decimal(18,9)
+ outputPriceUsd Decimal @map("output_price_usd") @db.Decimal(18,9)
+ creditsPerThousandTokens Int @default(1) @map("credits_per_thousand_tokens")
+ maxOutputTokens Int @default(2048) @map("max_output_tokens")
+ maxInputBytes Int @default(32768) @map("max_input_bytes")
+ priceSource String @map("price_source") @db.VarChar(500)
+ priceDate DateTime @map("price_date") @db.Timestamptz(3)
+ version Int @default(1)
+ provider AiProvider @relation(fields:[providerId],references:[id],onDelete:Restrict)
+ requests AiRequest[]
+ preferredBy AiOrganizationSettings[]
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+ @@unique([id,providerId])
+ @@unique([providerId,identifier])
+ @@map("ai_models")
+}
+model AiPrompt {
+ kind String @id @db.VarChar(30)
+ activeVersionId String? @unique @map("active_version_id") @db.Uuid
+ version Int @default(0)
+ activeVersion AiPromptVersion? @relation("AiActivePrompt",fields:[kind,activeVersionId],references:[kind,id],onDelete:Restrict,onUpdate:NoAction)
+ versions AiPromptVersion[] @relation("AiPromptHistory")
+ @@unique([kind,activeVersionId])
+ @@map("ai_prompts")
+}
+model AiPromptVersion {
+ id String @id @default(uuid()) @db.Uuid
+ kind String @db.VarChar(30)
+ revision Int
+ instructions String
+ createdById String @map("created_by_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ prompt AiPrompt @relation("AiPromptHistory",fields:[kind],references:[kind],onDelete:Restrict)
+ activeFor AiPrompt? @relation("AiActivePrompt")
+ creator PlatformAccount @relation(fields:[createdById],references:[id],onDelete:Restrict)
+ requests AiRequest[]
+ @@unique([kind,id])
+ @@unique([kind,revision])
+ @@map("ai_prompt_versions")
+}
+model AiOrganizationSettings {
+ organizationId String @id @map("organization_id") @db.Uuid
+ enabled Boolean @default(false)
+ preferredModelId String? @map("preferred_model_id") @db.Uuid
+ allowedModelIds String[] @default([]) @map("allowed_model_ids") @db.Uuid
+ consentedProviderHashes String[] @default([]) @map("consented_provider_hashes")
+ monthlySpendLimitUsd Decimal? @map("monthly_spend_limit_usd") @db.Decimal(18,9)
+ memberDailyCredits Int? @map("member_daily_credits")
+ consentById String? @map("consent_by_id") @db.Uuid
+ consentedAt DateTime? @map("consented_at") @db.Timestamptz(3)
+ version Int @default(1)
+ organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+ preferredModel AiModel? @relation(fields:[preferredModelId],references:[id],onDelete:Restrict)
+ consentBy Membership? @relation(fields:[organizationId,consentById],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction)
+ updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+ @@map("ai_organization_settings")
+}
+model AiMonthlyUsage {
+ organizationId String @map("organization_id") @db.Uuid
+ periodStart DateTime @map("period_start") @db.Timestamptz(3)
+ planUsed Int @default(0) @map("plan_used")
+ reservedPlan Int @default(0) @map("reserved_plan")
+ usedCredits Int @default(0) @map("used_credits")
+ inputTokens BigInt @default(0) @map("input_tokens")
+ cachedInputTokens BigInt @default(0) @map("cached_input_tokens")
+ outputTokens BigInt @default(0) @map("output_tokens")
+ costUsd Decimal @default(0) @map("cost_usd") @db.Decimal(24,9)
+ reservedUsd Decimal @default(0) @map("reserved_usd") @db.Decimal(24,9)
+ organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+ requests AiRequest[]
+ @@id([organizationId,periodStart])
+ @@map("ai_monthly_usage")
+}
+model AiWallet {
+ organizationId String @id @map("organization_id") @db.Uuid
+ availableExtra Int @default(0) @map("available_extra")
+ reservedExtra Int @default(0) @map("reserved_extra")
+ version Int @default(1)
+ organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+ @@map("ai_wallets")
+}
+model AiCreditEntry {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @map("organization_id") @db.Uuid
+ credits Int
+ kind String @db.VarChar(20)
+ reference String @db.VarChar(120)
+ reason String @db.VarChar(500)
+ requestId String? @map("request_id") @db.Uuid
+ platformActorId String? @map("platform_actor_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+ request AiRequest? @relation(fields:[organizationId,requestId],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction)
+ platformActor PlatformAccount? @relation(fields:[platformActorId],references:[id],onDelete:Restrict)
+ @@unique([organizationId,reference])
+ @@unique([organizationId,requestId])
+ @@map("ai_credit_entries")
+}
+model AiConversation {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @map("organization_id") @db.Uuid
+ membershipId String @map("membership_id") @db.Uuid
+ title String @db.VarChar(180)
+ archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+ erasedAt DateTime? @map("erased_at") @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+ member Membership @relation(fields:[organizationId,membershipId],references:[organizationId,id],onDelete:Restrict)
+ requests AiRequest[]
+ messages AiMessage[]
+ @@unique([organizationId,id])
+ @@unique([organizationId,id,membershipId])
+ @@index([organizationId,membershipId,createdAt])
+ @@map("ai_conversations")
+}
+model AiRequest {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @map("organization_id") @db.Uuid
+ membershipId String @map("membership_id") @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ sessionId String @map("session_id") @db.Uuid
+ conversationId String @map("conversation_id") @db.Uuid
+ clientKey String @map("client_key") @db.Uuid
+ inputHash String @map("input_hash") @db.VarChar(64)
+ payloadHash String @map("payload_hash") @db.VarChar(64)
+ purpose String @db.VarChar(30)
+ locale String @db.VarChar(5)
+ modelId String @map("model_id") @db.Uuid
+ providerId String @map("provider_id") @db.Uuid
+ providerVersion Int @map("provider_version")
+ modelVersion Int @map("model_version")
+ modelIdentifier String @map("model_identifier") @db.VarChar(160)
+ modelName String @map("model_name") @db.VarChar(120)
+ providerName String @map("provider_name") @db.VarChar(120)
+ endpointHash String @map("endpoint_hash") @db.VarChar(64)
+ promptVersionId String? @map("prompt_version_id") @db.Uuid
+ promptLabel String @map("prompt_label") @db.VarChar(80)
+ contextManifest Json @map("context_manifest")
+ contextSpec Json @map("context_spec")
+ status String @default("RESERVED") @db.VarChar(20)
+ periodStart DateTime @map("period_start") @db.Timestamptz(3)
+ providerPeriodStart DateTime @map("provider_period_start") @db.Timestamptz(3)
+ reservedPlan Int @map("reserved_plan")
+ reservedExtra Int @map("reserved_extra")
+ reservedUsd Decimal @map("reserved_usd") @db.Decimal(18,9)
+ maxInputTokens Int @map("max_input_tokens")
+ maxOutputTokens Int @map("max_output_tokens")
+ creditMultiplier Int @map("credit_multiplier")
+ inputPriceUsd Decimal @map("input_price_usd") @db.Decimal(18,9)
+ cachedInputPriceUsd Decimal @map("cached_input_price_usd") @db.Decimal(18,9)
+ outputPriceUsd Decimal @map("output_price_usd") @db.Decimal(18,9)
+ chargedCredits Int? @map("charged_credits")
+ inputTokens Int? @map("input_tokens")
+ cachedInputTokens Int? @map("cached_input_tokens")
+ outputTokens Int? @map("output_tokens")
+ costUsd Decimal? @map("cost_usd") @db.Decimal(18,9)
+ providerResponseId String? @map("provider_response_id") @db.VarChar(200)
+ errorCode String? @map("error_code") @db.VarChar(60)
+ leaseToken String? @map("lease_token") @db.Uuid
+ leaseUntil DateTime? @map("lease_until") @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ finishedAt DateTime? @map("finished_at") @db.Timestamptz(3)
+ organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+ member Membership @relation(fields:[organizationId,membershipId,userId],references:[organizationId,id,userId],onDelete:Restrict)
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ session UserSession @relation(fields:[sessionId,userId],references:[id,userId],onDelete:Restrict)
+ conversation AiConversation @relation(fields:[organizationId,conversationId,membershipId],references:[organizationId,id,membershipId],onDelete:Restrict,onUpdate:NoAction)
+ model AiModel @relation(fields:[modelId,providerId],references:[id,providerId],onDelete:Restrict)
+ promptVersion AiPromptVersion? @relation(fields:[promptVersionId],references:[id],onDelete:Restrict)
+ usage AiMonthlyUsage @relation(fields:[organizationId,periodStart],references:[organizationId,periodStart],onDelete:Restrict,onUpdate:NoAction)
+ providerUsage AiProviderMonthlyUsage @relation(fields:[providerId,providerPeriodStart],references:[providerId,periodStart],onDelete:Restrict,onUpdate:NoAction)
+ messages AiMessage[]
+ drafts AiDraft[]
+ receipt AiProviderReceipt?
+ credits AiCreditEntry[]
+ audit AiAudit[]
+ @@unique([organizationId,id])
+ @@unique([organizationId,id,membershipId])
+ @@unique([organizationId,id,conversationId])
+ @@unique([organizationId,membershipId,clientKey])
+ @@index([status,leaseUntil])
+ @@index([organizationId,membershipId,createdAt])
+ @@map("ai_requests")
+}
+model AiMessage {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @map("organization_id") @db.Uuid
+ conversationId String @map("conversation_id") @db.Uuid
+ membershipId String @map("membership_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ role String @db.VarChar(12)
+ body String
+ result Json?
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+ conversation AiConversation @relation(fields:[organizationId,conversationId,membershipId],references:[organizationId,id,membershipId],onDelete:Restrict)
+ request AiRequest @relation(fields:[organizationId,requestId,conversationId],references:[organizationId,id,conversationId],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([organizationId,requestId,role])
+ @@index([organizationId,conversationId,createdAt])
+ @@map("ai_messages")
+}
+model AiDraft {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @map("organization_id") @db.Uuid
+ membershipId String @map("membership_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ position Int
+ kind String @db.VarChar(30)
+ proposal Json
+ status String @default("PENDING") @db.VarChar(20)
+ version Int @default(1)
+ taskId String? @map("task_id") @db.Uuid
+ projectId String? @map("project_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz(3)
+ organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+ request AiRequest @relation(fields:[organizationId,requestId,membershipId],references:[organizationId,id,membershipId],onDelete:Restrict)
+ task Task? @relation("AiCreatedTask",fields:[organizationId,taskId],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction)
+ project Project? @relation("AiCreatedProject",fields:[organizationId,projectId],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([organizationId,id])
+ @@unique([organizationId,requestId,position])
+ @@index([organizationId,membershipId,status])
+ @@map("ai_drafts")
+}
+model AiProviderMonthlyUsage {
+ providerId String @map("provider_id") @db.Uuid
+ periodStart DateTime @map("period_start") @db.Timestamptz(3)
+ costUsd Decimal @default(0) @map("cost_usd") @db.Decimal(24,9)
+ reservedUsd Decimal @default(0) @map("reserved_usd") @db.Decimal(24,9)
+ inputTokens BigInt @default(0) @map("input_tokens")
+ outputTokens BigInt @default(0) @map("output_tokens")
+ provider AiProvider @relation(fields:[providerId],references:[id],onDelete:Restrict)
+ requests AiRequest[]
+ @@id([providerId,periodStart])
+ @@map("ai_provider_monthly_usage")
+}
+model AiAudit {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @map("organization_id") @db.Uuid
+ membershipId String? @map("membership_id") @db.Uuid
+ requestId String? @map("request_id") @db.Uuid
+ action String @db.VarChar(40)
+ detail Json
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+ member Membership? @relation(fields:[organizationId,membershipId],references:[organizationId,id],onDelete:Restrict)
+ request AiRequest? @relation(fields:[organizationId,requestId],references:[organizationId,id],onDelete:Restrict,onUpdate:NoAction)
+ @@index([organizationId,createdAt])
+ @@map("ai_audit")
+}
+model AiProviderReceipt {
+ requestId String @id @map("request_id") @db.Uuid
+ organizationId String @map("organization_id") @db.Uuid
+ membershipId String @map("membership_id") @db.Uuid
+ outcome String @db.VarChar(20)
+ inputTokens Int @map("input_tokens")
+ cachedInputTokens Int @map("cached_input_tokens")
+ outputTokens Int @map("output_tokens")
+ response Json?
+ errorCode String? @map("error_code") @db.VarChar(60)
+ providerResponseId String? @map("provider_response_id") @db.VarChar(200)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ request AiRequest @relation(fields:[organizationId,requestId,membershipId],references:[organizationId,id,membershipId],onDelete:Restrict,map:"ai_provider_receipts_request_fkey")
+ @@unique([organizationId,requestId,membershipId])
+ @@index([organizationId,membershipId,createdAt])
+ @@map("ai_provider_receipts")
+}

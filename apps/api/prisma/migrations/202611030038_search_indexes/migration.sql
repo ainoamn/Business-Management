@@ -1,0 +1,15 @@
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX tasks_search_title ON tasks USING GIN(title gin_trgm_ops);
+CREATE INDEX tasks_search_number ON tasks USING GIN(number gin_trgm_ops);
+CREATE INDEX projects_search_name ON projects USING GIN(name gin_trgm_ops);
+CREATE INDEX projects_search_number ON projects USING GIN(number gin_trgm_ops);
+CREATE INDEX meetings_search_title ON meetings USING GIN(title gin_trgm_ops);
+CREATE INDEX requests_search_title ON internal_requests USING GIN(title gin_trgm_ops);
+CREATE INDEX requests_search_number ON internal_requests USING GIN(number gin_trgm_ops);
+CREATE INDEX documents_search_title ON work_documents USING GIN(title gin_trgm_ops);
+CREATE INDEX workflows_search_name ON workflows USING GIN(name gin_trgm_ops);
+CREATE INDEX expenses_search_title ON operational_expenses USING GIN(title gin_trgm_ops);
+CREATE INDEX budgets_search_name ON operational_budgets USING GIN(name gin_trgm_ops);
+CREATE INDEX departments_search_name ON departments USING GIN(name gin_trgm_ops);
+CREATE INDEX users_search_name ON users USING GIN(display_name gin_trgm_ops);
+CREATE INDEX users_search_email ON users USING GIN(email gin_trgm_ops);

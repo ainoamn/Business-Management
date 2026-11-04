@@ -1,0 +1,7 @@
+import type {WorkAccess} from '../work/access';
+export type AiSourceKind='TASK'|'PROJECT'|'MEETING'|'DOCUMENT'|'REQUEST'|'REPORT'|'WORK_SCOPE';
+export interface AiSourceReference {key:string;kind:AiSourceKind;id:string;title:string;version:number|null;documentVersionId?:string}
+export interface AiMaterializedContext {data:Record<string,unknown>;sources:AiSourceReference[];truncated:boolean;grantSnapshot:WorkAccess['grants']}
+export function aiSourcePath(source:AiSourceReference){return source.kind==='REPORT'?'/app/reports':source.kind==='WORK_SCOPE'?'/app/tasks':`/app/${({TASK:'tasks',PROJECT:'projects',MEETING:'meetings',DOCUMENT:'documents',REQUEST:'requests'} as const)[source.kind]}/${source.id}`;}
+export function redactAiText(value:string){return value.replace(/\b(?:sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{16,}|Bearer\s+[A-Za-z0-9._~+/-]{12,})\b/gi,'[credential redacted]').replace(/\b([A-Za-z_]*(?:password|secret|api[_-]?key|access[_-]?token|credential[_-]?key)[A-Za-z_]*)\s*[:=]\s*["']?[^\s"']{3,}["']?/gi,'$1: [redacted]').replace(/\b(postgres(?:ql)?|mysql|redis|https?):\/\/[^:\s/]+:[^@\s/]+@[^\s]+/gi,'$1://[credentials redacted]');}
+export function safeAiData(value:unknown):unknown{if(typeof value==='string')return redactAiText(value);if(Array.isArray(value))return value.map(safeAiData);if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,safeAiData(item)]));return value;}

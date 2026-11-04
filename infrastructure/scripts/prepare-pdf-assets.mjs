@@ -1,0 +1,12 @@
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
+import {dirname,join} from 'node:path';
+import {cp,mkdir,readFile} from 'node:fs/promises';
+const require=createRequire(new URL('../../apps/web/package.json',import.meta.url));
+const manifest=require.resolve('pdfjs-dist/package.json');
+const {version}=JSON.parse(await readFile(manifest,'utf8'));
+if(!/^\d+\.\d+\.\d+$/.test(version))throw new Error('Invalid PDF asset version');
+const source=dirname(manifest),target=fileURLToPath(new URL(`../../apps/web/public/vendor/pdfjs/${version}/`,import.meta.url));
+await mkdir(target,{recursive:true});
+await cp(join(source,'build/pdf.worker.min.mjs'),join(target,'pdf.worker.min.mjs'));
+for(const name of ['cmaps','standard_fonts','wasm','LICENSE'])await cp(join(source,name),join(target,name),{recursive:true});

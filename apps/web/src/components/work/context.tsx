@@ -1,0 +1,24 @@
+import {createContext,useCallback,useContext,useEffect,useState,type PropsWithChildren} from 'react';
+import {useRouter} from 'next/router';
+import type {WorkSession,WorkOrganization,WorkspaceAccess} from '@work/shared-types';
+import {requestApi,HttpError} from '../../services/api';
+import {workError,type WorkValues} from './form';
+import {useWorkPreferences} from './auth-page';
+interface WorkspaceOrganization {id:string;name:string;locale:string;timezone:string;currency:string;settings:Record<string,unknown>|null}
+export interface WorkspaceContext {access:WorkspaceAccess;organization:WorkspaceOrganization}
+interface WorkContextValue extends ReturnType<typeof useWorkPreferences>{session:WorkSession|null|undefined;organizationId:string;context:WorkspaceContext|undefined;error:string;loading:boolean;selectOrganization:(id:string)=>void;reload:()=>void;logout:()=>Promise<void>;mutate:<T>(path:string,body?:unknown,method?:string)=>Promise<T>;base:string;can:(permission:string,global?:boolean)=>boolean}
+const WorkContext=createContext<WorkContextValue|null>(null);
+export function useWorkspace(){const value=useContext(WorkContext);if(!value)throw new Error('Workspace context missing');return value;}
+export function WorkspaceProvider({children}:PropsWithChildren){
+  const preferences=useWorkPreferences();const router=useRouter();const [session,setSession]=useState<WorkSession|null>();const [organizationId,setOrganizationId]=useState('');const [context,setContext]=useState<WorkspaceContext>();const [error,setError]=useState('');const [version,setVersion]=useState(0);const [loading,setLoading]=useState(true);
+  const reload=useCallback(()=>setVersion(current=>current+1),[]);
+  useEffect(()=>{const controller=new AbortController();setError('');void requestApi<WorkSession>('work/auth/me',{signal:controller.signal}).then(data=>{setSession(data);setOrganizationId(current=>{const saved=localStorage.getItem('work.organization');return data.organizations.some(org=>org.id===current)?current:data.organizations.some(org=>org.id===saved)?saved!:data.organizations[0]?.id??'';});},reason=>{if(controller.signal.aborted)return;if(reason instanceof HttpError&&reason.status===401){setSession(null);void router.replace(`/login?next=${encodeURIComponent(router.asPath)}`);}else setError(workError(preferences.t,reason));}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});return ()=>controller.abort();},[version,preferences.t]);
+  useEffect(()=>{setContext(undefined);if(!organizationId||!session?.user.emailVerified)return;const controller=new AbortController();setLoading(true);void requestApi<WorkspaceContext>(`work/organizations/${organizationId}/context`,{signal:controller.signal}).then(result=>{setContext(result);setError('');},reason=>{if(!controller.signal.aborted)setError(workError(preferences.t,reason));}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});return ()=>controller.abort();},[organizationId,session?.user.emailVerified,preferences.t,version]);
+  const selectOrganization=(id:string)=>{if(!session?.organizations.some(org=>org.id===id))return;setContext(undefined);setOrganizationId(id);localStorage.setItem('work.organization',id);};
+  async function logout(){if(session){try{await requestApi('work/auth/logout',{method:'POST',csrf:session.csrf});}catch(reason){if(!(reason instanceof HttpError&&reason.status===401))throw reason;}}setSession(null);await router.push('/login');}
+  async function mutate<T>(path:string,body?:unknown,method='POST'):Promise<T>{try{return await requestApi<T>(path,{method,body,csrf:session?.csrf});}catch(reason){if(reason instanceof HttpError&&reason.status===401){setSession(null);void router.push('/login');}throw reason;}}
+  const can=(permission:string,global=false)=>!!context?.access.grants.some(grant=>grant.permission===permission&&(!global||grant.scope==='ORGANIZATION'));
+  return <WorkContext.Provider value={{...preferences,session,organizationId,context,error,loading,selectOrganization,reload,logout,mutate,base:`work/organizations/${organizationId}`,can}}>{children}</WorkContext.Provider>;
+}
+export function organizationOptions(organizations:WorkOrganization[]){return organizations.map(value=>({value:value.id,label:value.name}));}
+export function flatValues(row:Record<string,unknown>,keys:string[]):WorkValues{return Object.fromEntries(keys.map(key=>{const value=row[key];return [key,value===null||typeof value==='string'||typeof value==='number'||typeof value==='boolean'||Array.isArray(value)?value:null];})) as WorkValues;}

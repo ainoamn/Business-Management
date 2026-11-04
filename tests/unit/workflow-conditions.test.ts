@@ -1,0 +1,9 @@
+import {describe,expect,it} from 'vitest';
+import {workflowPredicateSchema} from '../../packages/shared-schemas/src/workflows';
+import {workflowMatches,type WorkflowFacts} from '../../apps/api/src/work/workflow-conditions';
+const check=(condition:unknown,facts:WorkflowFacts)=>workflowMatches(workflowPredicateSchema.parse({mode:'ALL',conditions:[condition]}),facts);
+describe('workflow predicate evaluation',()=>{
+ it('compares monetary facts exactly without floating point rounding',()=>{expect(check({field:'baseAmount',operator:'GT',value:'100.124'},{baseAmount:'100.125'})).toBe(true);expect(check({field:'baseAmount',operator:'EQ',value:'100.125'},{baseAmount:'100.1250'})).toBe(true);expect(check({field:'baseAmount',operator:'LT',value:'0.300'},{baseAmount:'0.300'})).toBe(false);});
+ it('handles missing facts explicitly and fails closed for invalid numeric input',()=>{expect(check({field:'status',operator:'NE',value:'APPROVED'},{})).toBe(false);expect(check({field:'status',operator:'EMPTY'},{})).toBe(true);expect(check({field:'progress',operator:'GT',value:10},{progress:'NaN'})).toBe(false);expect(check({field:'progress',operator:'NOT_EMPTY'},{progress:0})).toBe(true);});
+ it('supports collection membership, equality and ALL/ANY groups',()=>{expect(check({field:'tags',operator:'IN',value:['urgent','followup']},{tags:['delivery','urgent']})).toBe(true);expect(check({field:'status',operator:'NOT_IN',value:['COMPLETED','CANCELLED']},{status:'IN_PROGRESS'})).toBe(true);const conditions=[{field:'status',operator:'EQ',value:'IN_PROGRESS'},{field:'progress',operator:'GTE',value:80}];expect(workflowMatches(workflowPredicateSchema.parse({mode:'ALL',conditions}),{status:'IN_PROGRESS',progress:50})).toBe(false);expect(workflowMatches(workflowPredicateSchema.parse({mode:'ANY',conditions}),{status:'IN_PROGRESS',progress:50})).toBe(true);});
+});
