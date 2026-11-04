@@ -159,6 +159,11 @@ describe('publishing, security operations and audits',()=>{
    for(const key of ['AI','AUTOMATION'])await ownerRequest('patch','operations/flags/'+key).send({enabled:true,version:1,reason:'Restore fixture availability'}).expect(200);
    const resumed=await runtime.withOrganization(user.id,org.id,tx=>app.get(BillingEntitlementsService).current(tx,org.id));expect(resumed.automationRuns).toBe(100);expect(resumed.aiCredits).toBe(100);const history=await ownerRequest('get','operations/flags').expect(200);expect(history.body.history).toHaveLength(4);await expect(appDb.platformFlagChange.updateMany({data:{reason:'FORGED'}})).rejects.toThrow();
   });
+  it('limits integration monitoring to aggregate states and freshly authorized platform settings readers',async()=>{
+   const secret='integration-secret-'+randomBytes(12).toString('hex');await admin.organizationIntegration.create({data:{organizationId:orgId,kind:'GOOGLE_CALENDAR',status:'CONNECTED',configEnc:secret}});
+   const result=await ownerRequest('get','operations/integrations').expect(200);expect(result.body.items.find((row:{kind:string})=>row.kind==='GOOGLE_CALENDAR')).toMatchObject({connected:1,adapterStatus:'NOT_CONFIGURED'});expect(result.body.items.some((row:{kind:string})=>row.kind==='ACCOUNTING')).toBe(true);expect(JSON.stringify(result.body)).not.toContain(secret);expect(JSON.stringify(result.body)).not.toContain(orgId);
+   await request(app.getHttpServer()).get('/api/v1/platform/operations/integrations').set('Cookie',readerCookie).expect(403);await expect(appDb.$queryRawUnsafe('SELECT * FROM platform_integration_counts()')).rejects.toThrow();
+  });
   it('revokes admin sessions and rejects their reuse',async()=>{
     await ownerRequest('post',`security/sessions/${reader.actor.sessionId}/revoke`).expect(201);
     await request(app.getHttpServer()).get('/api/v1/platform/resources/plans').set('Cookie',readerCookie).expect(401);

@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {integrationKinds,legacyIntegrationKinds} from '@work/shared-schemas';
 import {platformFlagKeys} from './feature-policy';
 import {ConflictException} from '@nestjs/common';
 import type {Response} from 'express';
@@ -13,6 +14,10 @@ import {authorize,validate} from './validation';
 @Injectable()
 export class PlatformOperationsService{
  constructor(private readonly db:PrismaService){}
+ integrations(actor:PlatformActor){return this.read(actor,'settings.read',async tx=>{
+  const counts=await tx.$queryRaw<Array<{kind:string;connected:bigint;pending:bigint;disconnected:bigint}>>`SELECT * FROM platform_integration_counts()`;
+  return {items:[...integrationKinds,...legacyIntegrationKinds.filter(kind=>counts.some(row=>row.kind===kind))].map(kind=>{const row=counts.find(item=>item.kind===kind);return {kind,adapterStatus:'NOT_CONFIGURED',connected:Number(row?.connected??0),pending:Number(row?.pending??0),disconnected:Number(row?.disconnected??0)};})};
+ });}
  private async read<T>(actor:PlatformActor,permission:PlatformPermission,operation:(tx:Prisma.TransactionClient)=>Promise<T>){
   authorize(actor,permission);return this.db.$transaction(async tx=>{
    await tx.$executeRaw`SELECT set_config('app.platform_account_id',${actor.id},true)`;await tx.$executeRaw`SELECT set_config('app.platform_session_id',${actor.sessionId},true)`;
@@ -41,6 +46,7 @@ export class PlatformOperationsService{
 @UseGuards(PlatformGuard)
 export class PlatformOperationsController{
  constructor(private readonly operations:PlatformOperationsService){}
+ @Get('integrations') integrations(@Req() request:PlatformRequest){return this.operations.integrations(request.platformActor);}
  @Get('flags') flags(@Req() request:PlatformRequest){return this.operations.flags(request.platformActor);}
  @Patch('flags/:key') flag(@Req() request:PlatformRequest,@Param('key') key:string,@Body() body:unknown,@Res({passthrough:true}) response:Response){return this.operations.saveFlag(request.platformActor,validate(z.enum(platformFlagKeys),key),body,String(response.getHeader('x-request-id')));}
  @Get('storage') storage(@Req() request:PlatformRequest,@Query() query:unknown){return this.operations.storage(request.platformActor,validate(platformQuerySchema,query));}
