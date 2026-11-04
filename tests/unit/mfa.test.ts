@@ -1,0 +1,10 @@
+import {describe,it,expect} from 'vitest';
+import {randomBytes} from 'node:crypto';
+import {generateTotpCode,matchingTotpCounter,generateRecoveryCodes,hashRecoveryCode,normalizeMfaCode,sealMfaSecret,openMfaSecret} from '../../apps/api/src/security/mfa';
+import {issueMfaProof,consumeMfaProof} from '../../apps/api/src/security/mfa-proof';
+describe('MFA cryptographic contracts',()=>{
+ it('matches RFC 6238 SHA1 vectors truncated to six digits',()=>{const secret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';for(const [seconds,code] of [[59,'287082'],[1111111109,'081804'],[1111111111,'050471'],[1234567890,'005924'],[2000000000,'279037'],[20000000000,'353130']] as const){expect(generateTotpCode(secret,seconds*1000)).toBe(code);expect(matchingTotpCounter(secret,code,seconds*1000)).toBe(BigInt(Math.floor(seconds/30)));}expect(matchingTotpCounter(secret,'not-code',59000)).toBeNull();});
+ it('normalizes Arabic and Persian digits and generates independent 128-bit backup codes',()=>{expect(normalizeMfaCode(' ١٢٣-۴۵۶ ')).toBe('123456');const codes=generateRecoveryCodes();expect(codes).toHaveLength(8);expect(new Set(codes).size).toBe(8);for(const code of codes){expect(code).toMatch(/^[A-F0-9]{8}(?:-[A-F0-9]{8}){3}$/);expect(hashRecoveryCode(code.toLowerCase())).toBe(hashRecoveryCode(code.replaceAll('-','')));}expect(hashRecoveryCode('ABCDEF1234')).toBe(hashRecoveryCode('abcdef1234'));});
+ it('authenticates encrypted secrets to their exact account and setup context',()=>{const key=randomBytes(32),sealed=sealMfaSecret(key,'SECRET','user:setup','USER');expect(openMfaSecret(key,sealed,'user:setup','USER')).toBe('SECRET');expect(()=>openMfaSecret(key,sealed,'user:other','USER')).toThrow();expect(()=>openMfaSecret(key,sealed,'user:setup','PLATFORM')).toThrow();});
+ it('accepts server-issued proofs only once and rejects serialized copies',()=>{const data={accountType:'USER' as const,accountId:'fixture',version:2,primaryHash:'hash'},proof=issueMfaProof({...data});expect(()=>consumeMfaProof({...proof},'USER','fixture',2,'hash')).toThrow();consumeMfaProof(proof,'USER','fixture',2,'hash');expect(()=>consumeMfaProof(proof,'USER','fixture',2,'hash')).toThrow();});
+});

@@ -1,0 +1,13 @@
+import {describe,expect,it} from 'vitest';
+import {capacityMinutes,currentWorkWeek} from '../../apps/api/src/work/work-capacity';
+describe('organization-local work capacity',()=>{
+ it('counts actual configured weekdays across month and leap-day boundaries',()=>{expect(capacityMinutes('2024-02-25','2024-03-02',[0,1,2,3,4],'08:00','17:00')).toEqual({minutes:2700,workDays:5});expect(capacityMinutes('2024-03-01','2024-03-02',[0,1,2,3,4],'08:00','17:00').minutes).toBe(0);});
+ it('applies explicit daily adjustments without double counting or treating a nonworking day as available',()=>{expect(capacityMinutes('2026-11-01','2026-11-07',[0,1,2,3,4],'08:00','17:00',[{from:'2026-11-02',to:'2026-11-03',minutesPerDay:240},{from:'2026-11-04',to:'2026-11-04',minutesPerDay:0}])).toEqual({minutes:1560,workDays:5});expect(()=>capacityMinutes('2026-11-01','2026-11-07',[0,1,2,3,4],'08:00','17:00',[{from:'2026-11-01',to:'2026-11-02',minutesPerDay:0},{from:'2026-11-02',to:'2026-11-03',minutesPerDay:60}])).toThrow('OVERLAPPING_CAPACITY_ADJUSTMENTS');});
+ it('uses the organization local calendar and configured first workday rather than the browser or server date',()=>{expect(currentWorkWeek('Asia/Muscat',[0,1,2,3,4],new Date('2026-10-31T22:00:00Z'))).toEqual({from:'2026-11-01',to:'2026-11-07'});expect(currentWorkWeek('America/Los_Angeles',[0,1,2,3,4],new Date('2026-10-31T22:00:00Z'))).toEqual({from:'2026-10-25',to:'2026-10-31'});});
+ it('rejects invalid calendar dates, reversed ranges, excessive periods and invalid working hours',()=>{expect(()=>capacityMinutes('2026-02-30','2026-03-01',[0],'08:00','17:00')).toThrow('INVALID_CAPACITY_DATE');expect(()=>capacityMinutes('2026-11-04','2026-11-03',[0],'08:00','17:00')).toThrow('INVALID_CAPACITY_PERIOD');expect(()=>capacityMinutes('2026-01-01','2026-12-31',[0],'08:00','17:00')).toThrow('INVALID_CAPACITY_PERIOD');expect(()=>capacityMinutes('2026-11-01','2026-11-07',[0],'17:00','08:00')).toThrow('INVALID_WORKING_HOURS');});
+});
+
+it('excludes company holidays once, including overlaps and personal adjustments',()=>{
+ const holidays=[{from:'2026-11-02',to:'2026-11-03'},{from:'2026-11-02',to:'2026-11-02'},{from:'2026-11-07',to:'2026-11-07'}];expect(capacityMinutes('2026-11-01','2026-11-07',[0,1,2,3,4],'08:00','17:00',[],holidays)).toEqual({minutes:1620,workDays:3});expect(capacityMinutes('2026-11-01','2026-11-07',[0,1,2,3,4],'08:00','17:00',[{from:'2026-11-01',to:'2026-11-07',minutesPerDay:240}],holidays)).toEqual({minutes:720,workDays:3});
+});
+it('validates holiday calendar ranges',()=>{expect(()=>capacityMinutes('2026-11-01','2026-11-07',[0,1,2,3,4],'08:00','17:00',[],[{from:'2026-11-03',to:'2026-11-02'}])).toThrow();});

@@ -6,6 +6,7 @@ import {PrismaService} from '../database/prisma.service';
 import {environment} from '../config/environment';
 import {csrfFor,digest,dummyPasswordHash,matchesCsrf,originAllowed,permissionsFor,verifyPassword} from './security';
 import {MfaService} from '../security/mfa.service';
+import {consumeMfaProof,type MfaProof} from '../security/mfa-proof';
 
 export type PlatformRequest=Request & {platformActor:PlatformActor;platformToken:string};
 const cookieName='work_platform_session';
@@ -39,20 +40,23 @@ export class PlatformAuth {
       throw new UnauthorizedException('Invalid credentials');
     }
     await this.db.platformLoginAttempt.updateMany({where:{id:{in:attempts.map(item=>item.id)}},data:{succeeded:true}});
-    if(account.mfaEnabled)return this.mfa.createChallenge('PLATFORM',account.id);
-    return this.completeMfaLogin(account.id,request,response);
+    if(account.mfaEnabled)return this.mfa.createChallenge('PLATFORM',account.id,account.passwordHash);
+    return this.completeMfaLogin(account.id,request,response,undefined,account.passwordHash);
   }
-  async completeMfaLogin(accountId:string,request:Request,response:Response){
+  async completeMfaLogin(accountId:string,request:Request,response:Response,proof?:MfaProof,expectedPasswordHash?:string){
     checkOrigin(request);
-    const account=await this.db.platformAccount.findUnique({where:{id:accountId},include:{role:true}});
-    if(!account||account.disabledAt)throw new UnauthorizedException('Invalid credentials');
     const settings=await this.db.platformSettings.findUnique({where:{id:'main'}});
     const token=randomBytes(32).toString('hex');
     const expiresAt=new Date(Date.now()+(settings?.sessionMinutes??60)*60000);
-    const session=await this.db.$transaction(async tx=>{
+    const {session,account}=await this.db.$transaction(async tx=>{
+      await tx.$queryRaw`SELECT id FROM platform_accounts WHERE id=${accountId}::uuid FOR UPDATE`;
+      const account=await tx.platformAccount.findUnique({where:{id:accountId},include:{role:true}});
+      if(!account||account.disabledAt)throw new UnauthorizedException('Invalid credentials');
+      if(proof||account.mfaEnabled)consumeMfaProof(proof,'PLATFORM',accountId,account.mfaVersion,digest(account.passwordHash));
+      else if(!expectedPasswordHash||account.passwordHash!==expectedPasswordHash)throw new UnauthorizedException('Credentials changed');
       const created=await tx.platformSession.create({data:{accountId:account.id,tokenHash:digest(token),expiresAt}});
       await tx.platformAudit.create({data:{actorId:account.id,action:'LOGIN',resource:'security',requestId:String(response.getHeader('x-request-id'))}});
-      return created;
+      return {session:created,account};
     });
     this.cookie(response,token,expiresAt);
     return {actor:{id:account.id,email:account.email,displayName:account.displayName,isOwner:account.isOwner,permissions:permissionsFor(account.isOwner,account.role?.permissions??[]),sessionId:session.id},csrf:csrfFor(token)};

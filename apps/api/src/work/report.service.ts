@@ -1,3 +1,4 @@
+import {BillingEntitlementsService} from '../billing/billing-entitlements.service';
 import {BadRequestException,Injectable} from '@nestjs/common';
 import {Prisma} from '@prisma/client';
 import type {ReportQuery,WorkPermission} from '@work/shared-schemas';
@@ -8,7 +9,7 @@ import {RequestService} from './request.service';
 import {FinanceService} from './finance.service';
 import {TimeService} from './time.service';
 import {WorkflowService} from './workflow.service';
-import {requirePermission,type WorkAccess} from './access';
+import {requireGlobal,requirePermission,type WorkAccess} from './access';
 import type {WorkIdentity} from './identity.service';
 export interface ReportColumn {key:string;format?:'number'|'date'|'status'|'hours'|'money'}
 export type ReportCell=string|number|boolean|null;
@@ -18,15 +19,32 @@ const dates=(q:ReportQuery)=>({...q.from?{gte:new Date(q.from)}:{},...q.to?{lt:n
 function reportAccess(a:WorkAccess,permission:'reports.read'|'reports.export',module:WorkPermission):WorkAccess{return {...a,grants:a.grants.filter(grant=>grant.permission===permission).map(grant=>({...grant,permission:module}))};}
 @Injectable()
 export class ReportService{
- constructor(private readonly organizations:OrganizationService,private readonly execution:ExecutionService,private readonly meetings:MeetingService,private readonly requests:RequestService,private readonly finance:FinanceService,private readonly time:TimeService,private readonly workflows:WorkflowService){}
+ constructor(private readonly organizations:OrganizationService,private readonly execution:ExecutionService,private readonly meetings:MeetingService,private readonly requests:RequestService,private readonly finance:FinanceService,private readonly time:TimeService,private readonly workflows:WorkflowService,private readonly entitlements:BillingEntitlementsService){}
  async report(user:WorkIdentity,org:string,q:ReportQuery,exporting=false,requestId?:string){return this.organizations.execute(user,org,async(tx,a)=>{requirePermission(a,'reports.read');if(exporting)requirePermission(a,'reports.export');if(exporting&&requestId)await this.organizations.audit(tx,user,org,requestId,'REPORT_EXPORT_REQUESTED','report_'+q.kind,org);return this.evaluate(tx,a,q,exporting);});}
- async evaluate(tx:Prisma.TransactionClient,a:WorkAccess,q:ReportQuery,exporting=false,additionalScope?:WorkAccess['grants']){const data=await this.load(tx,a,q,exporting,additionalScope);if(q.compare){const end=new Date(q.from!),start=new Date(end.getTime()-(Date.parse(q.to!)-end.getTime()));const previous=await this.load(tx,a,{...q,from:start.toISOString(),to:end.toISOString(),page:1,pageSize:1,compare:false},exporting,additionalScope);data.previous={from:start.toISOString(),to:end.toISOString(),summary:previous.summary};}return data;}
+ async evaluate(tx:Prisma.TransactionClient,a:WorkAccess,q:ReportQuery,exporting=false,additionalScope?:WorkAccess['grants']){if(q.compare||!['tasks','completion','delays'].includes(q.kind))await this.entitlements.require(tx,a.organizationId,'ADVANCED_REPORTS');const data=await this.load(tx,a,q,exporting,additionalScope);if(q.compare){const end=new Date(q.from!),start=new Date(end.getTime()-(Date.parse(q.to!)-end.getTime()));const previous=await this.load(tx,a,{...q,from:start.toISOString(),to:end.toISOString(),page:1,pageSize:1,compare:false},exporting,additionalScope);data.previous={from:start.toISOString(),to:end.toISOString(),summary:previous.summary};}return data;}
  private async people(tx:Prisma.TransactionClient,org:string,ids:Array<string|null>){const rows=await tx.membership.findMany({where:{organizationId:org,id:{in:ids.filter((id):id is string=>!!id)}},select:{id:true,user:{select:{displayName:true}}}});return new Map(rows.map(row=>[row.id,row.user.displayName]));}
  async load(tx:Prisma.TransactionClient,a:WorkAccess,q:ReportQuery,exporting:boolean,additionalScope?:WorkAccess['grants']):Promise<ReportData>{
   requirePermission(a,'reports.read');if(exporting)requirePermission(a,'reports.export');
   const organizationId=a.organizationId,now=new Date(),paging={skip:(q.page-1)*q.pageSize,take:q.pageSize},period=dates(q),scoped=(module:WorkPermission)=>[reportAccess(a,'reports.read',module),...(exporting?[reportAccess(a,'reports.export',module)]:[]),...(additionalScope?[{...a,grants:additionalScope.map(grant=>({...grant,permission:module}))}]:[])];
   const result:ReportData={timezone:(await tx.organization.findUniqueOrThrow({where:{id:organizationId},select:{timezone:true}})).timezone,kind:q.kind,dateBasis:'createdAt',columns:[],items:[],total:0,summary:{},chart:[],generatedAt:now.toISOString(),page:q.page,pageSize:q.pageSize};
-  if(['tasks','completion','delays','employees','departments','workload'].includes(q.kind)){
+  if(q.kind==='subscriptions'){
+   requireGlobal(a,'billing.read');for(const access of scoped('billing.read'))requireGlobal(access,'billing.read');
+   const where:Prisma.PlatformSubscriptionWhereInput={organizationId,...q.status?{status:q.status}:{},...q.from||q.to?{createdAt:period}:{}};
+   const rows=await tx.platformSubscription.findMany({where,select:{id:true,status:true,seats:true,unitPrice:true,cycle:true,periodStart:true,endsAt:true,cancelAtPeriodEnd:true,createdAt:true,plan:{select:{name:true}}},orderBy:[{createdAt:'desc'},{id:'asc'}],...paging});
+   result.items=rows.map(row=>({id:row.id,name:row.plan.name,status:row.status,seats:row.seats,unitPrice:row.unitPrice.toFixed(3),cycle:row.cycle,periodStart:row.periodStart.toISOString(),endsAt:row.endsAt.toISOString(),cancelAtPeriodEnd:row.cancelAtPeriodEnd,createdAt:row.createdAt.toISOString()}));
+   const aggregate=await tx.platformSubscription.aggregate({where,_count:true,_sum:{seats:true}});result.total=aggregate._count;result.summary={subscriptions:result.total,seats:aggregate._sum.seats??0};result.chart=(await tx.platformSubscription.groupBy({by:['status'],where,_count:true})).map(row=>({label:row.status,value:row._count}));
+   result.columns=[{key:'name'},{key:'status',format:'status'},{key:'seats',format:'number'},{key:'unitPrice',format:'money'},{key:'cycle',format:'status'},{key:'periodStart',format:'date'},{key:'endsAt',format:'date'},{key:'cancelAtPeriodEnd'},{key:'createdAt',format:'date'}];
+  }else if(q.kind==='ai-usage'){
+   requirePermission(a,'ai.read');const ownOnly=![a,...scoped('ai.read')].every(access=>access.grants.some(grant=>grant.permission==='ai.read'&&grant.scope==='ORGANIZATION'));
+   const source=Prisma.sql`FROM work_ai_usage_metadata(${q.from?new Date(q.from):null}::timestamptz,${q.to?new Date(q.to):null}::timestamptz) r WHERE (NOT ${ownOnly} OR r.membership_id=${a.membershipId}::uuid) AND (${q.membershipId??null}::uuid IS NULL OR r.membership_id=${q.membershipId??null}::uuid) AND (${q.departmentId??null}::uuid IS NULL OR r.department_id=${q.departmentId??null}::uuid) AND (${q.status??null}::text IS NULL OR r.status=${q.status??null}::text)`;
+   type UsageRow={id:string;membership_id:string;purpose:string;model_name:string;status:string;charged_credits:number|null;reserved_credits:number;cost_usd:Prisma.Decimal|null;reserved_usd:Prisma.Decimal;input_tokens:number|null;output_tokens:number|null;created_at:Date};
+   const rows=await tx.$queryRaw<UsageRow[]>(Prisma.sql`SELECT r.* ${source} ORDER BY r.created_at DESC,r.id ASC LIMIT ${paging.take} OFFSET ${paging.skip}`),names=await this.people(tx,organizationId,rows.map(row=>row.membership_id));
+   result.items=rows.map(row=>({id:row.id,member:names.get(row.membership_id)??'—',purpose:row.purpose,modelName:row.model_name,status:row.status,chargedCredits:row.charged_credits,reservedCredits:row.reserved_credits,costUsd:row.cost_usd?.toFixed(9)??null,reservedUsd:row.reserved_usd.toFixed(9),inputTokens:row.input_tokens,outputTokens:row.output_tokens,createdAt:row.created_at.toISOString()}));
+   const [aggregate]=await tx.$queryRaw<Array<{count:bigint;charged:bigint;reserved:bigint;cost:Prisma.Decimal;held:Prisma.Decimal}>>(Prisma.sql`SELECT count(*) AS count,coalesce(sum(charged_credits),0)::bigint AS charged,coalesce(sum(CASE WHEN status IN ('RESERVED','RUNNING','UNCERTAIN') THEN reserved_credits ELSE 0 END),0)::bigint AS reserved,coalesce(sum(cost_usd),0) AS cost,coalesce(sum(CASE WHEN status IN ('RESERVED','RUNNING','UNCERTAIN') THEN reserved_usd ELSE 0 END),0) AS held ${source}`);
+   result.total=Number(aggregate?.count??0);result.summary={aiRequests:result.total,chargedCredits:Number(aggregate?.charged??0),heldCredits:Number(aggregate?.reserved??0),costUsd:aggregate?.cost.toFixed(9)??'0',heldUsd:aggregate?.held.toFixed(9)??'0'};
+   result.chart=(await tx.$queryRaw<Array<{status:string;count:bigint}>>(Prisma.sql`SELECT status,count(*) AS count ${source} GROUP BY status ORDER BY status`)).map(row=>({label:row.status,value:Number(row.count)}));
+   result.columns=[{key:'member'},{key:'purpose',format:'status'},{key:'modelName'},{key:'status',format:'status'},{key:'chargedCredits',format:'number'},{key:'reservedCredits',format:'number'},{key:'costUsd',format:'money'},{key:'inputTokens',format:'number'},{key:'outputTokens',format:'number'},{key:'createdAt',format:'date'}];
+  }else if(['tasks','completion','delays','employees','departments','workload'].includes(q.kind)){
    const filters:Prisma.TaskWhereInput[]=[await this.execution.taskFilter(tx,a,'tasks.read')];for(const access of scoped('tasks.read'))filters.push(await this.execution.taskFilter(tx,access,'tasks.read'));
    const dateBasis=q.kind==='completion'?'completedAt':['delays','workload'].includes(q.kind)?'dueDate':'createdAt';result.dateBasis=dateBasis;
    const cancelled=(await tx.taskStatus.findMany({where:{organizationId,category:'CANCELLED'},select:{key:true}})).map(row=>row.key);

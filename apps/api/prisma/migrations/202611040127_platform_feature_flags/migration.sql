@@ -1,0 +1,14 @@
+BEGIN;
+CREATE TABLE platform_feature_flags(id uuid PRIMARY KEY,key varchar(40) NOT NULL UNIQUE CHECK(key IN ('AI','AUTOMATION','PORTFOLIOS','WORKLOAD')),enabled boolean NOT NULL DEFAULT true,reason varchar(500) NOT NULL CHECK(length(reason)>=5),version integer NOT NULL DEFAULT 1 CHECK(version>0),updated_by uuid NOT NULL REFERENCES platform_accounts(id),updated_at timestamptz(3) NOT NULL);
+CREATE TABLE platform_flag_changes(id uuid PRIMARY KEY,key varchar(40) NOT NULL CHECK(key IN ('AI','AUTOMATION','PORTFOLIOS','WORKLOAD')),enabled boolean NOT NULL,previous_enabled boolean NOT NULL,version integer NOT NULL CHECK(version>0),reason varchar(500) NOT NULL CHECK(length(reason)>=5),actor_id uuid NOT NULL REFERENCES platform_accounts(id),created_at timestamptz(3) NOT NULL DEFAULT now(),UNIQUE(key,version));
+CREATE INDEX platform_flag_changes_created_at_idx ON platform_flag_changes(created_at);
+ALTER TABLE platform_feature_flags ENABLE ROW LEVEL SECURITY;ALTER TABLE platform_feature_flags FORCE ROW LEVEL SECURITY;
+CREATE POLICY flag_runtime_read ON platform_feature_flags FOR SELECT TO work_app USING(true);
+CREATE POLICY flag_admin_insert ON platform_feature_flags FOR INSERT TO work_app WITH CHECK(public.platform_ops_can('settings.manage') AND updated_by=NULLIF(current_setting('app.platform_account_id',true),'')::uuid);
+CREATE POLICY flag_admin_update ON platform_feature_flags FOR UPDATE TO work_app USING(public.platform_ops_can('settings.manage')) WITH CHECK(public.platform_ops_can('settings.manage') AND updated_by=NULLIF(current_setting('app.platform_account_id',true),'')::uuid);
+GRANT SELECT,INSERT,UPDATE ON platform_feature_flags TO work_app;REVOKE DELETE,TRUNCATE ON platform_feature_flags FROM work_app;
+ALTER TABLE platform_flag_changes ENABLE ROW LEVEL SECURITY;ALTER TABLE platform_flag_changes FORCE ROW LEVEL SECURITY;
+CREATE POLICY flag_change_read ON platform_flag_changes FOR SELECT TO work_app USING(public.platform_ops_can('settings.read') OR public.platform_ops_can('settings.manage'));
+CREATE POLICY flag_change_insert ON platform_flag_changes FOR INSERT TO work_app WITH CHECK(public.platform_ops_can('settings.manage') AND actor_id=NULLIF(current_setting('app.platform_account_id',true),'')::uuid);
+GRANT SELECT,INSERT ON platform_flag_changes TO work_app;REVOKE UPDATE,DELETE,TRUNCATE ON platform_flag_changes FROM work_app;
+COMMIT;

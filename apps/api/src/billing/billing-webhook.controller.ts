@@ -26,8 +26,11 @@ export class BillingWebhookController {
     }
     if(event.status!=='PAID')return {ok:true,ignored:true};
     try{
-      await this.db.$queryRaw<Array<{status:string}>>`SELECT billing_settle_hosted_payment(${event.eventId},${event.checkoutId},${event.reference}::uuid) AS status`;
+      const receipt=await this.payments.retrieveCheckout(event.checkoutId);
+      if(receipt.status!=='PAID'||receipt.reference!==event.reference||receipt.mode!==event.mode||!receipt.paymentId||!receipt.paidAt)throw new BadRequestException({code:'PAYMENT_VERIFIED_RECEIPT_REQUIRED',message:'Payment settlement rejected'});
+      await this.db.$queryRaw<Array<{status:string}>>`SELECT billing_settle_hosted_payment(${event.eventId},${receipt.id},${receipt.reference}::uuid,${receipt.amountMinor},${receipt.currency},${receipt.mode},${receipt.paymentId},${new Date(receipt.paidAt)}::timestamptz) AS status`;
     }catch(error){
+      if(error instanceof PaymentProviderError)throw new BadRequestException({code:error.code,message:'Payment settlement rejected'});
       if(error instanceof Prisma.PrismaClientKnownRequestError&&error.code==='P2010'){
         const message=String(error.meta?.message??'');
         const code=message.match(/\b[A-Z][A-Z0-9_]{2,50}\b/)?.[0];

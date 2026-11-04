@@ -9,8 +9,9 @@ import {csrfFor,digest,dummyPasswordHash,hashPassword,verifyPassword} from '../c
 import {validate} from '../common/validation';
 import {createOrganizationSchema,workRegisterSchema} from '@work/shared-schemas';
 import {MfaService} from '../security/mfa.service';
+import {consumeMfaProof,type MfaProof} from '../security/mfa-proof';
 
-export interface WorkIdentity {id:string;email:string;username:string|null;displayName:string;emailVerified:boolean;sessionId:string}
+export interface WorkIdentity {id:string;email:string;username:string|null;displayName:string;emailVerified:boolean;sessionId:string;bhdSub?:string|null}
 export interface OrganizationSummary {id:string;name:string;slug:string;locale:string;timezone:string;role:string;membership_id:string}
 export const workCookie='work_user_session';
 
@@ -51,13 +52,16 @@ export class IdentityService {
     const valid=await verifyPassword(password,user?.passwordHash??dummyPasswordHash);
     if(!user||user.disabledAt||!valid)throw new UnauthorizedException('Invalid credentials');
     await this.db.userLoginAttempt.updateMany({where:{id:{in:attempts}},data:{succeeded:true}});
-    if(user.mfaEnabled)return this.mfa.createChallenge('USER',user.id);
-    return this.completeMfaLogin(user.id,request,response);
+    if(user.mfaEnabled)return this.mfa.createChallenge('USER',user.id,user.passwordHash);
+    return this.completeMfaLogin(user.id,request,response,undefined,user.passwordHash);
   }
-  async completeMfaLogin(userId:string,request:Request,response:Response){
+  async completeMfaLogin(userId:string,request:Request,response:Response,proof?:MfaProof,expectedPasswordHash?:string){
     const session=await this.db.$transaction(async tx=>{
+      await tx.$queryRaw`SELECT id FROM users WHERE id=${userId}::uuid FOR UPDATE`;
       const fresh=await tx.user.findUnique({where:{id:userId}});
       if(!fresh||fresh.disabledAt||fresh.deletedAt)throw new UnauthorizedException('Invalid credentials');
+      if(proof||fresh.mfaEnabled)consumeMfaProof(proof,'USER',userId,fresh.mfaVersion,digest(fresh.passwordHash));
+      else if(!expectedPasswordHash||fresh.passwordHash!==expectedPasswordHash)throw new UnauthorizedException('Credentials changed');
       return this.issue(tx,userId,request);
     });
     this.cookie(response,session.token,session.expiresAt);
@@ -70,7 +74,7 @@ export class IdentityService {
     if(!session||session.revokedAt||session.expiresAt<=new Date()||session.user.deletedAt||session.user.disabledAt)throw new UnauthorizedException('Session expired');
     if(session.lastSeenAt.getTime()<Date.now()-60000)await this.db.userSession.update({where:{id:session.id},data:{lastSeenAt:new Date()}});
     const user=session.user;
-    return {identity:{id:user.id,email:user.email,username:user.username,displayName:user.displayName,emailVerified:!!user.emailVerifiedAt,sessionId:session.id} satisfies WorkIdentity,token:raw};
+    return {identity:{id:user.id,email:user.email,username:user.username,displayName:user.displayName,emailVerified:!!user.emailVerifiedAt,sessionId:session.id,bhdSub:user.bhdSub} satisfies WorkIdentity,token:raw};
   }
   async organizations(identity:WorkIdentity){return this.db.$transaction(async tx=>{await tx.$executeRaw`SELECT set_config('app.user_id',${identity.id},true)`;return tx.$queryRaw<OrganizationSummary[]>`SELECT * FROM work_my_organizations()`;});}
   async me(identity:WorkIdentity,token:string){return {user:identity,organizations:await this.organizations(identity),csrf:csrfFor(token),developmentMail:environment.DEPLOYMENT_ENV==='development'&&environment.MAIL_DELIVERY_MODE==='outbox'};}

@@ -3,3 +3,5 @@
 ابدأ بتقرير الفحص `architecture/repository-assessment.md`، ثم `architecture/system-architecture.md` وخطة التنفيذ `product/backlog.md`. مصدر النطاق الكامل في `product/master-engineering-prompt.txt`، والحالة التنفيذية في `../PROJECT_STATUS.md`.
 
 الوثائق تصف ما نُفذ وما يلزم لاحقاً بوضوح؛ وجود التصميم لا يعني تنفيذ الميزة. نتائج التشغيل المسجلة فقط هي المرجع لقبول المرحلة.
+
+للتجربة العملية اقرأ [تشغيل بيانات التجربة](user-guide/demo.md)، و[دليل مساحة العمل](user-guide/workspace.md)، و[دليل إدارة المنصة](user-guide/platform-admin.md). تشمل الإضافات الحديثة [ملفات الموظفين والشعار والعطل](architecture/member-profiles.md)، و[الدعم](architecture/support.md)، و[مفاتيح الميزات](architecture/feature-flags.md).

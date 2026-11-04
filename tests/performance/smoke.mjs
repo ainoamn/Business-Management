@@ -1,116 +1,24 @@
-#!/usr/bin/env node
-/**
- * Performance smoke test
- * 
- * Tests basic API responsiveness with concurrent requests.
- * Skips gracefully if server is not running.
- * 
- * Usage: node smoke.mjs [url] [concurrent] [duration]
- * Example: node smoke.mjs http://localhost:3000 10 5
- */
-
-const API_URL = process.argv[2] || 'http://localhost:3000';
-const CONCURRENT = parseInt(process.argv[3] || '10', 10);
-const DURATION_SECONDS = parseInt(process.argv[4] || '5', 10);
-
-async function checkHealth() {
-  try {
-    const response = await fetch(`${API_URL}/api/v1/health/live`, {
-      signal: AbortSignal.timeout(3000)
-    });
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
-}
-
-async function runRequest() {
-  const start = Date.now();
-  try {
-    const response = await fetch(`${API_URL}/api/v1/health/live`, {
-      signal: AbortSignal.timeout(5000)
-    });
-    const duration = Date.now() - start;
-    return {
-      success: response.ok,
-      status: response.status,
-      duration
-    };
-  } catch (error) {
-    return {
-      success: false,
-      status: 0,
-      duration: Date.now() - start,
-      error: error.message
-    };
-  }
-}
-
-async function smokeSuite() {
-  console.log(`🔥 Performance Smoke Test`);
-  console.log(`   URL: ${API_URL}`);
-  console.log(`   Concurrent: ${CONCURRENT}`);
-  console.log(`   Duration: ${DURATION_SECONDS}s\n`);
-
-  // Check if server is running
-  console.log('Checking server health...');
-  const healthy = await checkHealth();
-  if (!healthy) {
-    console.log('⚠️  Server not responding, skipping test');
-    process.exit(0);
-  }
-  console.log('✓ Server is healthy\n');
-
-  const results = [];
-  const startTime = Date.now();
-  const endTime = startTime + (DURATION_SECONDS * 1000);
-
-  console.log('Running requests...');
-  
-  while (Date.now() < endTime) {
-    const batch = [];
-    for (let i = 0; i < CONCURRENT; i++) {
-      batch.push(runRequest());
-    }
-    const batchResults = await Promise.all(batch);
-    results.push(...batchResults);
-    
-    // Small delay between batches
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-
-  const totalTime = Date.now() - startTime;
-  const successCount = results.filter(r => r.success).length;
-  const failCount = results.length - successCount;
-  const durations = results.map(r => r.duration);
-  const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
-  const maxDuration = Math.max(...durations);
-  const minDuration = Math.min(...durations);
-  const requestsPerSecond = (results.length / (totalTime / 1000)).toFixed(2);
-
-  console.log(`\n📊 Results:`);
-  console.log(`   Total requests: ${results.length}`);
-  console.log(`   Successful: ${successCount}`);
-  console.log(`   Failed: ${failCount}`);
-  console.log(`   Requests/sec: ${requestsPerSecond}`);
-  console.log(`   Avg response: ${avgDuration.toFixed(0)}ms`);
-  console.log(`   Min response: ${minDuration}ms`);
-  console.log(`   Max response: ${maxDuration}ms`);
-
-  if (failCount > 0) {
-    console.log(`\n⚠️  ${failCount} requests failed`);
-    const errors = results.filter(r => !r.success);
-    const errorSample = errors.slice(0, 3);
-    errorSample.forEach(err => {
-      console.log(`   Status ${err.status}: ${err.error || 'Unknown error'}`);
-    });
-  }
-
-  console.log(successCount === results.length ? '\n✅ All requests successful' : '\n❌ Some requests failed');
-  process.exit(failCount > 0 ? 1 : 0);
-}
-
-smokeSuite().catch(error => {
-  console.error('❌ Test failed:', error);
-  process.exit(1);
-});
+import {config} from 'dotenv';
+import {createRequire} from 'node:module';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {randomBytes} from 'node:crypto';
+import {performance} from 'node:perf_hooks';
+config({path:fileURLToPath(new URL('../../.env',import.meta.url)),quiet:true});
+const require=createRequire(new URL('../../apps/api/package.json',import.meta.url)),{PrismaClient}=require('@prisma/client');
+const connection=new URL(process.env.MIGRATION_DATABASE_URL);if(process.env.DEPLOYMENT_ENV!=='development'||!['127.0.0.1','localhost'].includes(connection.hostname))throw new Error('Performance verification requires isolated local development PostgreSQL');
+const concurrency=Number(process.argv[2]??5),seconds=Number(process.argv[3]??5);if(!Number.isInteger(concurrency)||concurrency<1||concurrency>10||!Number.isInteger(seconds)||seconds<1||seconds>30)throw new Error('Use concurrency 1–10 and duration 1–30 seconds');
+const suffix=randomBytes(8).toString('hex'),database=`performance_${suffix}`,provisioner=new PrismaClient({datasourceUrl:connection.toString()}),password=`Fixture-${randomBytes(24).toString('hex')}`;let created=false,admin,app;
+if(!/^performance_[a-f0-9]{16}$/.test(database))throw new Error('Unsafe fixture database');
+try{
+ await provisioner.$executeRawUnsafe(`CREATE DATABASE "${database}"`);created=true;const source=new URL(connection);source.pathname='/'+database;execFileSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy','--schema',fileURLToPath(new URL('../../apps/api/prisma/schema.prisma',import.meta.url))],{windowsHide:true,stdio:'pipe',timeout:60000,env:{...process.env,DATABASE_URL:source.toString()}});admin=new PrismaClient({datasourceUrl:source.toString()});const runtime=new URL(process.env.DATABASE_URL);runtime.pathname='/'+database;process.env.DATABASE_URL=runtime.toString();process.env.NODE_ENV='test';
+ const {hashPassword}=require('../../apps/api/dist/common/credentials.js'),user=await admin.user.create({data:{email:`fixture-${suffix}@example.invalid`,displayName:'Performance fixture',emailVerifiedAt:new Date(),passwordHash:await hashPassword(password)}}),org=await admin.organization.create({data:{name:'Performance fixture',slug:'performance-'+suffix}}),member=await admin.membership.create({data:{organizationId:org.id,userId:user.id,role:'ORGANIZATION_OWNER'}});await admin.taskStatus.create({data:{organizationId:org.id,key:'NEW',nameAr:'جديدة',nameEn:'New',category:'OPEN',position:0}});for(let batch=0;batch<4;batch++)await admin.task.createMany({data:Array.from({length:500},(_,i)=>({organizationId:org.id,number:'PERF-'+(batch*500+i+1),title:(i%2?'Delivery task ':'مهمة التنفيذ ')+(batch*500+i+1),description:'Isolated performance fixture',assignedToId:member.id,createdById:member.id,estimatedHours:'2.50',dueDate:new Date(Date.now()+(i%30-15)*86400000),visibility:i%5?'PRIVATE':'ORGANIZATION',tags:[]}))});
+ const {createApp}=require('../../apps/api/dist/bootstrap.js');app=await createApp();app.useLogger(false);await app.listen(0,'127.0.0.1');const base=await app.getUrl(),login=await fetch(base+'/api/v1/work/auth/login',{method:'POST',headers:{Origin:process.env.WEB_ORIGIN,'Content-Type':'application/json'},body:JSON.stringify({identifier:user.email,password})});if(!login.ok)throw new Error('Fixture sign-in failed');const cookie=login.headers.getSetCookie().map(value=>value.split(';')[0]).join(';'),prefix=base+'/api/v1/work/organizations/'+org.id;
+ const paths=['/dashboard','/tasks?page=1&pageSize=20','/search?q=Delivery&kind=tasks&pageSize=20','/reports?kind=tasks&pageSize=20'];
+ async function read(path){const start=performance.now(),response=await fetch(prefix+path,{headers:{Cookie:cookie},signal:globalThis.AbortSignal.timeout(10000)});const body=await response.json();if(!response.ok)throw new Error('Read failed with HTTP '+response.status+' for '+path);if(path.startsWith('/tasks')&&body.total!==2000)throw new Error('Task fixture was not read');if(path.startsWith('/search')&&body.total!==1000)throw new Error('Search fixture count mismatch');if(path.startsWith('/reports')&&body.total!==2000)throw new Error('Report fixture count mismatch');return performance.now()-start;}
+ for(const path of paths)await read(path);const results=paths.map(path=>({path,durations:[]}));let index=0;const start=performance.now(),deadline=start+seconds*1000;
+ await Promise.all(Array.from({length:concurrency},async()=>{while(performance.now()<deadline){const item=results[index++%results.length];item.durations.push(await read(item.path));await new Promise(resolve=>setTimeout(resolve,20));}}));
+ const summarize=values=>{const ordered=[...values].sort((a,b)=>a-b),percentile=p=>Math.round(ordered[Math.min(ordered.length-1,Math.ceil(ordered.length*p)-1)]??0);return {requests:ordered.length,p50Ms:percentile(.5),p95Ms:percentile(.95),maxMs:percentile(1)};};
+ const elapsedMs=Math.round(performance.now()-start),summary={createdAt:new Date().toISOString(),fixtureOnly:true,taskCount:2000,concurrency,elapsedMs,overall:summarize(results.flatMap(row=>row.durations)),endpoints:results.map(row=>({path:row.path,...summarize(row.durations)})),note:'Local API/database smoke measurement; does not establish production capacity or an SLA.'};const directory=fileURLToPath(new URL('../../.local/performance/',import.meta.url));await mkdir(directory,{recursive:true});await writeFile(directory+database+'.json',JSON.stringify(summary,null,2)+'\n');console.log(JSON.stringify(summary,null,2));
+}finally{if(app)await app.close();if(admin)await admin.$disconnect();if(created){await provisioner.$executeRawUnsafe(`DROP DATABASE "${database}" WITH (FORCE)`);}await provisioner.$disconnect();}

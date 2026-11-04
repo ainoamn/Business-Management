@@ -1,8 +1,9 @@
+import {integrationKinds,legacyIntegrationKinds,type IntegrationKind} from '@work/shared-schemas';
 import {BadRequestException,Injectable,NotFoundException} from '@nestjs/common';
-import type {Prisma} from '@prisma/client';
 import {PrismaService} from '../database/prisma.service';
 import {OrganizationService} from '../work/organization.service';
 import {requireGlobal} from '../work/access';
+import {UnconfiguredAccountingProvider,UnconfiguredHrProvider,type AccountingProvider,type HrProvider} from './business-providers';
 import type {WorkIdentity} from '../work/identity.service';
 import {
   CalendarProvider,
@@ -15,7 +16,7 @@ import {
   UnconfiguredSsoProvider
 } from './providers';
 
-export type IntegrationKind='CALENDAR'|'DRIVE'|'TEAMS'|'SSO_GOOGLE'|'SSO_MICROSOFT'|'SSO_OKTA';
+export type {IntegrationKind} from '@work/shared-schemas';
 
 @Injectable()
 export class IntegrationsService {
@@ -26,6 +27,8 @@ export class IntegrationsService {
   ssoGoogle:SsoProvider=new UnconfiguredSsoProvider();
   ssoMicrosoft:SsoProvider=new UnconfiguredSsoProvider();
   ssoOkta:SsoProvider=new UnconfiguredSsoProvider();
+  accounting:AccountingProvider=new UnconfiguredAccountingProvider();
+  hr:HrProvider=new UnconfiguredHrProvider();
 
   constructor(
     private readonly db:PrismaService,
@@ -44,13 +47,13 @@ export class IntegrationsService {
         select:{id:true,kind:true,status:true,createdAt:true,updatedAt:true}
       });
 
-      const allKinds:IntegrationKind[]=['CALENDAR','DRIVE','TEAMS','SSO_GOOGLE','SSO_MICROSOFT','SSO_OKTA'];
-      const existing=new Set(integrations.map(i=>i.kind));
+      const allKinds:IntegrationKind[]=[...integrationKinds,...legacyIntegrationKinds.filter(kind=>integrations.some(row=>row.kind===kind))];
+      
       
       // Add missing kinds as DISCONNECTED
       const full=allKinds.map(kind=>
         integrations.find(i=>i.kind===kind)||{
-          id:null,
+          id:`unconfigured:${kind}`,
           kind,
           status:'DISCONNECTED',
           createdAt:null,
@@ -65,7 +68,7 @@ export class IntegrationsService {
   /**
    * Connect an integration (stub - returns NOT_CONFIGURED error).
    */
-  async connect(user:WorkIdentity,organizationId:string,kind:IntegrationKind,config:unknown){
+  async connect(user:WorkIdentity,organizationId:string,kind:IntegrationKind,_config:unknown){
     return this.organizations.execute(user,organizationId,async(tx,access)=>{
       requireGlobal(access,'organization.manage');
       

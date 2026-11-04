@@ -44,6 +44,11 @@ export const environmentSchema = z.object({
   PAYMENT_WEBHOOK_SECRET:z.string().min(16).optional(),
   PAYMENT_MODE:z.enum(['SANDBOX','LIVE']).optional(),
   PAYMENT_CHECKOUT_HOSTS:z.string().min(1).optional(),
+  BHD_IDENTITY_ISSUER:z.string().url().optional(),
+  BHD_OAUTH_CLIENT_ID:z.string().min(1).optional(),
+  BHD_OAUTH_CLIENT_SECRET:z.string().min(8).optional(),
+  BHD_OAUTH_REDIRECT_URI:z.string().url().optional(),
+  BHD_IDENTITY_TOKEN_SECRET:z.string().min(16).optional(),
 }).superRefine((env, ctx) => {
   if (env.DEPLOYMENT_ENV !== 'development' && env.NODE_ENV !== 'test') {
     if(env.DOCUMENT_STORAGE_MODE==='local')ctx.addIssue({code:'custom',path:['DOCUMENT_STORAGE_MODE'],message:'Local document storage is limited to development'});
@@ -68,3 +73,8 @@ export * from './search';
 export * from './reports';
 export * from './ai';
 export * from './billing';
+export * from './portfolios';
+export * from './approvals';
+export * from './workload';
+
+export * from './integrations';

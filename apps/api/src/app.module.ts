@@ -1,3 +1,16 @@
+import {OrganizationExtrasController} from './work/organization-extras.controller';
+import {OrganizationExtrasService} from './work/organization-extras.service';
+import {MemberProfileController} from './work/member-profile.controller';
+import {MemberProfileService} from './work/member-profile.service';
+import {SupportService} from './platform/support.service';
+import {PlatformSupportController,WorkSupportController} from './platform/support.controller';
+import {PlatformOperationsController,PlatformOperationsService} from './platform/operations';
+import {WorkloadService} from './work/workload.service';
+import {WorkloadController} from './work/workload.controller';
+import {ApprovalService} from './work/approval.service';
+import {ApprovalController} from './work/approval.controller';
+import {PortfolioService} from './work/portfolio.service';
+import {PortfolioController} from './work/portfolio.controller';
 import {BillingWorkerService} from './billing/billing-worker.service';
 import {BillingService} from './billing/billing.service';
 import {BillingWebhookController} from './billing/billing-webhook.controller';
@@ -62,5 +75,7 @@ import {WorkMfaController,PlatformMfaController,AuthMfaController} from './secur
 import {NotificationChannelProviders} from './notifications/channel-providers';
 import {IntegrationsService} from './integrations/integrations.service';
 import {IntegrationsController} from './integrations/integrations.controller';
-@Module({controllers:[HealthController,BillingPlatformController,BillingPublicController,BillingWorkController,BillingWebhookController,AiPlatformController,AiWorkController,PlatformController,PlatformLoginController,PublicSiteController,WorkController,WorkPublicController,ExecutionController,OperationsController,MeetingController,RequestController,FinanceController,DocumentController,WorkflowController,SearchController,ReportController,WorkMfaController,PlatformMfaController,AuthMfaController,IntegrationsController],providers:[PrismaService,RedisService,QueueService,StorageService,HealthService,PlatformAuth,PlatformGuard,PlatformService,MailService,IdentityService,WorkGuard,OrganizationService,ExecutionService,NotificationService,TimeService,MeetingService,RequestService,FinanceService,DocumentStorageService,DocumentAccessService,DocumentService,DocumentUploadInterceptor,WorkflowService,WorkflowResourcesService,WorkflowActorsService,WorkflowSchedulesService,WorkflowEngineService,SearchService,ReportService,ReportExportService,AiConfigurationService,AiCredentialsService,AiContextService,AiDocumentTextService,AiQuotaService,AiRequestService,AiSettlementService,AiDraftsService,BillingConfigurationService,BillingService,BillingEntitlementsService,BillingWorkerService,MfaService,NotificationChannelProviders,IntegrationsService,{provide:PAYMENT_PROVIDER,useFactory:()=>createPaymentProvider(environment)}]})
+import {BhdController} from './auth/bhd.controller';
+import {BhdService} from './auth/bhd.service';
+@Module({controllers:[OrganizationExtrasController,MemberProfileController,PlatformSupportController,WorkSupportController,PlatformOperationsController,HealthController,WorkloadController,ApprovalController,PortfolioController,BillingPlatformController,BillingPublicController,BillingWorkController,BillingWebhookController,AiPlatformController,AiWorkController,PlatformController,PlatformLoginController,PublicSiteController,WorkController,WorkPublicController,ExecutionController,OperationsController,MeetingController,RequestController,FinanceController,DocumentController,WorkflowController,SearchController,ReportController,WorkMfaController,PlatformMfaController,AuthMfaController,IntegrationsController,BhdController],providers:[OrganizationExtrasService,MemberProfileService,SupportService,PlatformOperationsService,PrismaService,WorkloadService,ApprovalService,PortfolioService,RedisService,QueueService,StorageService,HealthService,PlatformAuth,PlatformGuard,PlatformService,MailService,IdentityService,WorkGuard,OrganizationService,ExecutionService,NotificationService,TimeService,MeetingService,RequestService,FinanceService,DocumentStorageService,DocumentAccessService,DocumentService,DocumentUploadInterceptor,WorkflowService,WorkflowResourcesService,WorkflowActorsService,WorkflowSchedulesService,WorkflowEngineService,SearchService,ReportService,ReportExportService,AiConfigurationService,AiCredentialsService,AiContextService,AiDocumentTextService,AiQuotaService,AiRequestService,AiSettlementService,AiDraftsService,BillingConfigurationService,BillingService,BillingEntitlementsService,BillingWorkerService,MfaService,NotificationChannelProviders,IntegrationsService,BhdService,{provide:PAYMENT_PROVIDER,useFactory:()=>createPaymentProvider(environment)}]})
 export class AppModule {}

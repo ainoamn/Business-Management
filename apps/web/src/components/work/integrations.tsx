@@ -1,3 +1,4 @@
+import {integrationKinds} from '@work/shared-schemas';
 import {useState} from 'react';
 import {useWorkspace} from './context';
 import {useWorkData,WorkState,WorkTable,type WorkRow} from './data';
@@ -6,7 +7,7 @@ import {HttpError} from '../../services/api';
 
 interface IntegrationRow extends WorkRow{kind:string;status:string}
 
-const kinds=['CALENDAR','DRIVE','TEAMS','SSO_GOOGLE','SSO_MICROSOFT','SSO_OKTA'] as const;
+const kinds=integrationKinds;
 
 function useText(){const {locale}=useWorkspace();return (ar:string,en:string)=>locale==='ar'?ar:en;}
 
@@ -20,7 +21,7 @@ export function IntegrationsPanel(){
   const d=useText();
   const remote=useWorkData<IntegrationRow[]>(can('organization.manage',true)?`${base}/integrations`:undefined);
   const [error,setError]=useState('');
-  const labels:Record<string,[string,string]>={CALENDAR:['التقويم','Calendar'],DRIVE:['التخزين السحابي','Cloud drive'],TEAMS:['Teams','Teams'],SSO_GOOGLE:['Google SSO','Google SSO'],SSO_MICROSOFT:['Microsoft SSO','Microsoft SSO'],SSO_OKTA:['Okta SSO','Okta SSO'],DISCONNECTED:['غير متصل','Disconnected'],CONNECTED:['متصل','Connected'],PENDING:['قيد الإعداد','Pending']};
+  const labels:Record<string,[string,string]>={GOOGLE_CALENDAR:['تقويم Google','Google Calendar'],OUTLOOK_CALENDAR:['تقويم Outlook','Outlook Calendar'],GOOGLE_DRIVE:['Google Drive','Google Drive'],ONEDRIVE:['OneDrive','OneDrive'],WHATSAPP_BUSINESS:['WhatsApp Business','WhatsApp Business'],EMAIL:['البريد الإلكتروني','Email'],SMS:['الرسائل النصية','SMS'],PAYMENTS:['بوابة الدفع','Payment gateway'],ACCOUNTING:['الأنظمة المحاسبية','Accounting systems'],HR:['الموارد البشرية','Human resources'],CALENDAR:['التقويم','Calendar'],DRIVE:['التخزين السحابي','Cloud drive'],TEAMS:['Teams','Teams'],SSO_GOOGLE:['Google SSO','Google SSO'],SSO_MICROSOFT:['Microsoft SSO','Microsoft SSO'],SSO_OKTA:['Okta SSO','Okta SSO'],DISCONNECTED:['غير متصل','Disconnected'],CONNECTED:['متصل','Connected'],PENDING:['قيد الإعداد','Pending']};
   const label=(key:string)=>labels[key]?d(...labels[key]):key;
   const rows:IntegrationRow[]=(remote.data??kinds.map(kind=>({id:`missing-${kind}`,kind,status:'DISCONNECTED'}))) as IntegrationRow[];
 

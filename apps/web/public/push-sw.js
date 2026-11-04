@@ -1,3 +1,4 @@
+/* global self */
 /**
  * Push Notification Service Worker
  * 
@@ -5,7 +6,7 @@
  * Registers automatically when push notifications are enabled in user preferences.
  */
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   console.log('[Push SW] Installed');
   self.skipWaiting();
 });

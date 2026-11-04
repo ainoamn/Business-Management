@@ -40,7 +40,7 @@ export class PlatformController {
   @Get('monitoring')
   async monitoring(@Req() request:PlatformRequest) {
     authorize(request.platformActor,'monitoring.read');
-    return {readiness:await this.health.check(),process:{uptimeSeconds:Math.floor(process.uptime()),memoryMb:Math.round(process.memoryUsage().rss/1048576)},integrations:{payments:'NOT_CONFIGURED',email:'NOT_CONFIGURED',ai:'NOT_CONFIGURED'}};
+    return {readiness:await this.health.check(),process:{uptimeSeconds:Math.floor(process.uptime()),memoryMb:Math.round(process.memoryUsage().rss/1048576)},integrations:await this.service.integrationStatus(request.platformActor)};
   }
   @Get('settings')
   settings(@Req() request:PlatformRequest) {return this.service.settings(request.platformActor);}

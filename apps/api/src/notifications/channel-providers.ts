@@ -2,15 +2,15 @@ import {Injectable,Logger} from '@nestjs/common';
 import {environment} from '../config/environment';
 
 export interface SmsProvider {
-  send(recipient:string,message:string):Promise<void>;
+  send(recipient:string,_message:string):Promise<void>;
 }
 
 export interface WhatsAppProvider {
-  send(recipient:string,message:string):Promise<void>;
+  send(recipient:string,_message:string):Promise<void>;
 }
 
 export interface PushProvider {
-  send(subscription:PushSubscription,payload:PushPayload):Promise<void>;
+  send(subscription:PushSubscription,_payload:PushPayload):Promise<void>;
 }
 
 export interface PushSubscription {
@@ -28,8 +28,8 @@ export interface PushPayload {
 export class UnconfiguredSmsProvider implements SmsProvider {
   private readonly logger=new Logger(UnconfiguredSmsProvider.name);
 
-  async send(recipient:string,message:string):Promise<void>{
-    this.logger.warn(`SMS not configured: would send to ${recipient}`);
+  async send(_recipient:string,_message:string):Promise<void>{
+    this.logger.warn('SMS provider not configured');
     throw new Error('SMS_PROVIDER_NOT_CONFIGURED');
   }
 }
@@ -38,8 +38,8 @@ export class UnconfiguredSmsProvider implements SmsProvider {
 export class UnconfiguredWhatsAppProvider implements WhatsAppProvider {
   private readonly logger=new Logger(UnconfiguredWhatsAppProvider.name);
 
-  async send(recipient:string,message:string):Promise<void>{
-    this.logger.warn(`WhatsApp not configured: would send to ${recipient}`);
+  async send(_recipient:string,_message:string):Promise<void>{
+    this.logger.warn('WhatsApp provider not configured');
     throw new Error('WHATSAPP_PROVIDER_NOT_CONFIGURED');
   }
 }
@@ -48,14 +48,14 @@ export class UnconfiguredWhatsAppProvider implements WhatsAppProvider {
 export class UnconfiguredPushProvider implements PushProvider {
   private readonly logger=new Logger(UnconfiguredPushProvider.name);
 
-  async send(subscription:PushSubscription,payload:PushPayload):Promise<void>{
-    this.logger.warn(`Push not configured: would send to ${subscription.endpoint}`);
+  async send(_subscription:PushSubscription,_payload:PushPayload):Promise<void>{
+    this.logger.warn('Push provider not configured');
     throw new Error('PUSH_PROVIDER_NOT_CONFIGURED');
   }
 }
 
 /**
- * Real push provider using Web Push with VAPID.
+ * Reserved adapter for Web Push; delivery is not implemented.
  * Requires VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in environment.
  */
 @Injectable()
@@ -82,7 +82,7 @@ export class WebPushProvider implements PushProvider {
     return this.publicKey;
   }
 
-  async send(subscription:PushSubscription,payload:PushPayload):Promise<void>{
+  async send(_subscription:PushSubscription,_payload:PushPayload):Promise<void>{
     if(!this.enabled){
       throw new Error('PUSH_PROVIDER_NOT_CONFIGURED');
     }
@@ -92,7 +92,7 @@ export class WebPushProvider implements PushProvider {
     // webpush.setVapidDetails('mailto:support@example.com', this.publicKey!, this.privateKey!);
     // await webpush.sendNotification(subscription, JSON.stringify(payload));
     
-    this.logger.log(`Would send push to ${subscription.endpoint}: ${payload.title}`);
+    this.logger.warn('Web Push delivery is not implemented');
     throw new Error('WEB_PUSH_NOT_IMPLEMENTED_YET');
   }
 }

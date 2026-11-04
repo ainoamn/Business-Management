@@ -1,3 +1,4 @@
+import {PrismaService} from './database/prisma.service';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -21,7 +22,7 @@ export async function createApp() {
     next();
   });
   app.enableCors({origin:environment.WEB_ORIGIN,credentials:true,methods:['GET','HEAD','OPTIONS','POST','PATCH','DELETE']});
-  app.useGlobalFilters(new ErrorFilter());
+  app.useGlobalFilters(new ErrorFilter(app.get(PrismaService)));
   app.enableShutdownHooks();
   if (environment.DEPLOYMENT_ENV === 'development') {
     SwaggerModule.setup('api/docs',app,SwaggerModule.createDocument(app,new DocumentBuilder().setTitle('Work Management Platform API').setVersion('0.1.0').build()));

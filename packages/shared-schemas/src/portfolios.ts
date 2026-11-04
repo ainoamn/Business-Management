@@ -1,0 +1,11 @@
+import {z} from 'zod';
+import {workQuerySchema} from './work';
+const uuid=z.string().uuid().toLowerCase();
+const date=z.iso.datetime({offset:true}).nullable().default(null);
+const base=z.object({name:z.string().trim().min(2).max(180),kind:z.enum(['PORTFOLIO','PROGRAM']).default('PORTFOLIO'),description:z.string().trim().max(20000).default(''),objective:z.string().trim().max(5000).default(''),ownerId:uuid,status:z.enum(['PLANNED','ACTIVE','ON_HOLD','COMPLETED']).default('PLANNED'),startsAt:date,endsAt:date});
+const dates=(value:{startsAt:string|null;endsAt:string|null})=>!value.startsAt||!value.endsAt||Date.parse(value.startsAt)<=Date.parse(value.endsAt);
+export const portfolioSchema=base.refine(dates,{path:['endsAt'],message:'End must follow start'});
+export const portfolioUpdateSchema=base.extend({version:z.number().int().positive()}).refine(dates,{path:['endsAt'],message:'End must follow start'});
+export const portfolioLinkSchema=z.object({version:z.number().int().positive(),projectId:uuid}).strict();
+export const portfolioQuerySchema=workQuerySchema.extend({archived:z.enum(['true','false']).default('false').transform(value=>value==='true')});
+export type PortfolioQuery=z.infer<typeof portfolioQuerySchema>;

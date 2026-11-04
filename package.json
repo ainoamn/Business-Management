@@ -9,6 +9,8 @@
     "db:local": "node infrastructure/scripts/local-postgres.mjs",
     "db:local:stop": "node infrastructure/scripts/local-postgres.mjs --stop",
     "billing:catalog": "node infrastructure/scripts/billing-catalog.mjs",
+    "demo:seed": "node infrastructure/scripts/demo-seed.mjs",
+    "demo:start": "node infrastructure/scripts/demo-start.mjs",
     "platform:bootstrap": "node infrastructure/scripts/platform-bootstrap.mjs",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",

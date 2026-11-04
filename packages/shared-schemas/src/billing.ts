@@ -17,3 +17,5 @@ export const paymentCheckoutSchema=z.object({id:z.string().regex(/^[A-Za-z0-9_.:
 export const paymentEventSchema=z.object({eventId:z.string().regex(/^[A-Za-z0-9_.:-]{1,200}$/),checkoutId:z.string().regex(/^[A-Za-z0-9_.:-]{1,200}$/),reference:uuid,mode:z.enum(['SANDBOX','LIVE']),status:z.enum(['PAID','FAILED','CANCELED']),occurredAt:date}).strict();
 export type PaymentCheckout=z.infer<typeof paymentCheckoutSchema>;
 export type PaymentEvent=z.infer<typeof paymentEventSchema>;
+
+export const billingResumePaymentSchema=z.object({version:z.number().int().positive(),maximumAmount:money}).strict();

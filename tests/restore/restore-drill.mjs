@@ -1,138 +1,44 @@
-#!/usr/bin/env node
-/**
- * Database Restore Drill
- * 
- * Documents and validates the database backup/restore process.
- * Runs in dry-run mode by default (does not execute destructive commands).
- * 
- * Usage: node restore-drill.mjs [--execute]
- * 
- * Steps documented:
- * 1. Create backup using pg_dump
- * 2. Verify backup file integrity
- * 3. Document restore command
- * 4. (Optional) Execute test restore to temporary database
- */
-
-const EXECUTE_MODE = process.argv.includes('--execute');
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://app_user:password@localhost:55432/work_db';
-
-// Parse connection string
-function parseDbUrl(url) {
-  const match = url.match(/postgresql:\/\/([^:]+):([^@]+)@([^:\/]+):(\d+)\/(.+)/);
-  if (!match) throw new Error('Invalid DATABASE_URL format');
-  return {
-    user: match[1],
-    password: match[2],
-    host: match[3],
-    port: match[4],
-    database: match[5]
-  };
-}
-
-function formatCommand(cmd) {
-  return `  $ ${cmd}`;
-}
-
-function printStep(num, title) {
-  console.log(`\n${num}. ${title}`);
-  console.log('─'.repeat(60));
-}
-
-async function dryRunDrill() {
-  const db = parseDbUrl(DATABASE_URL);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupFile = `backup-${db.database}-${timestamp}.sql`;
-  const testDbName = `${db.database}_restore_test`;
-
-  console.log('🔄 Database Restore Drill (DRY RUN)');
-  console.log('═'.repeat(60));
-  console.log(`Database: ${db.database}@${db.host}:${db.port}`);
-  console.log(`User: ${db.user}`);
-  console.log(`Mode: ${EXECUTE_MODE ? 'EXECUTE' : 'DRY RUN'}`);
-
-  printStep(1, 'Create backup using pg_dump');
-  console.log('\nFull backup (schema + data):');
-  console.log(formatCommand(
-    `pg_dump -h ${db.host} -p ${db.port} -U ${db.user} -d ${db.database} -F p -f ${backupFile}`
-  ));
-  console.log('\nSchema only:');
-  console.log(formatCommand(
-    `pg_dump -h ${db.host} -p ${db.port} -U ${db.user} -d ${db.database} -s -f schema-${timestamp}.sql`
-  ));
-  console.log('\nData only:');
-  console.log(formatCommand(
-    `pg_dump -h ${db.host} -p ${db.port} -U ${db.user} -d ${db.database} -a -f data-${timestamp}.sql`
-  ));
-
-  printStep(2, 'Verify backup file integrity');
-  console.log('\nCheck file exists and has content:');
-  console.log(formatCommand(`ls -lh ${backupFile}`));
-  console.log(formatCommand(`head -n 20 ${backupFile}`));
-  console.log('\nValidate SQL syntax (optional):');
-  console.log(formatCommand(`psql -h ${db.host} -p ${db.port} -U ${db.user} -d ${db.database} --dry-run -f ${backupFile}`));
-
-  printStep(3, 'Restore to new database');
-  console.log('\nCreate test database:');
-  console.log(formatCommand(
-    `createdb -h ${db.host} -p ${db.port} -U ${db.user} ${testDbName}`
-  ));
-  console.log('\nRestore backup:');
-  console.log(formatCommand(
-    `psql -h ${db.host} -p ${db.port} -U ${db.user} -d ${testDbName} -f ${backupFile}`
-  ));
-  console.log('\nVerify restore:');
-  console.log(formatCommand(
-    `psql -h ${db.host} -p ${db.port} -U ${db.user} -d ${testDbName} -c "\\dt"`
-  ));
-  console.log(formatCommand(
-    `psql -h ${db.host} -p ${db.port} -U ${db.user} -d ${testDbName} -c "SELECT COUNT(*) FROM users;"`
-  ));
-
-  printStep(4, 'Production restore procedure');
-  console.log('\n⚠️  PRODUCTION RESTORE CHECKLIST:');
-  console.log('  [ ] Notify all users of maintenance window');
-  console.log('  [ ] Stop all application services');
-  console.log('  [ ] Verify no active connections:');
-  console.log(formatCommand(
-    `psql -h ${db.host} -p ${db.port} -U postgres -c "SELECT * FROM pg_stat_activity WHERE datname = '${db.database}';"`
-  ));
-  console.log('  [ ] Terminate connections if needed:');
-  console.log(formatCommand(
-    `psql -h ${db.host} -p ${db.port} -U postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${db.database}' AND pid <> pg_backend_pid();"`
-  ));
-  console.log('  [ ] Drop and recreate database:');
-  console.log(formatCommand(`dropdb -h ${db.host} -p ${db.port} -U postgres ${db.database}`));
-  console.log(formatCommand(`createdb -h ${db.host} -p ${db.port} -U postgres ${db.database}`));
-  console.log('  [ ] Restore backup:');
-  console.log(formatCommand(
-    `psql -h ${db.host} -p ${db.port} -U ${db.user} -d ${db.database} -f ${backupFile}`
-  ));
-  console.log('  [ ] Verify critical tables and counts');
-  console.log('  [ ] Run application health checks');
-  console.log('  [ ] Start application services');
-  console.log('  [ ] Monitor logs for errors');
-
-  printStep(5, 'Automated backup schedule');
-  console.log('\nDaily backup cron (3 AM):');
-  console.log('  0 3 * * * /usr/bin/pg_dump -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} ${DB_NAME} | gzip > /backups/$(date +\\%Y\\%m\\%d).sql.gz');
-  console.log('\nRetention policy (keep 30 days):');
-  console.log('  0 4 * * * find /backups -name "*.sql.gz" -mtime +30 -delete');
-
-  printStep(6, 'Disaster recovery time objectives');
-  console.log('\nRTO (Recovery Time Objective): 4 hours');
-  console.log('RPO (Recovery Point Objective): 24 hours (daily backups)');
-  console.log('\nFor critical systems, consider:');
-  console.log('  - Continuous WAL archiving for point-in-time recovery');
-  console.log('  - Hot standby replica for failover');
-  console.log('  - Off-site backup storage');
-
-  console.log('\n✅ Dry run complete');
-  console.log('\nTo execute test restore:');
-  console.log('  node restore-drill.mjs --execute');
-}
-
-dryRunDrill().catch(error => {
-  console.error('❌ Drill failed:', error);
-  process.exit(1);
-});
+import {config} from 'dotenv';
+import {createRequire} from 'node:module';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import {mkdir,readFile,writeFile,stat} from 'node:fs/promises';
+import {createHash,randomBytes} from 'node:crypto';
+import {join,resolve} from 'node:path';
+import assert from 'node:assert/strict';
+config({path:fileURLToPath(new URL('../../.env',import.meta.url)),quiet:true});
+const require=createRequire(new URL('../../apps/api/package.json',import.meta.url)),{PrismaClient}=require('@prisma/client');
+if(process.env.DEPLOYMENT_ENV!=='development'||!process.env.MIGRATION_DATABASE_URL)throw new Error('Restore drills require isolated local development PostgreSQL');
+const connection=new URL(process.env.MIGRATION_DATABASE_URL);if(!['127.0.0.1','localhost'].includes(connection.hostname))throw new Error('Restore drill is local-only');
+const suffix=randomBytes(8).toString('hex'),sourceName=`restore_source_${suffix}`,targetName=`restore_target_${suffix}`;
+const safe=name=>{if(!/^restore_(source|target)_[a-f0-9]{16}$/.test(name))throw new Error('Unsafe fixture database');return '"'+name+'"';};
+const directory=fileURLToPath(new URL('../../.local/restore-drills/'+suffix+'/',import.meta.url));await mkdir(directory,{recursive:true});
+const bin=process.env.PG_BIN_DIR?resolve(process.env.PG_BIN_DIR):process.platform==='win32'?fileURLToPath(new URL('../../.local/postgresql-tools-18.6/',import.meta.url)):'';
+const binary=name=>bin?join(bin,name+(process.platform==='win32'?'.exe':'')):name;
+function run(name,args,database){return execFileSync(binary(name),args,{windowsHide:true,timeout:60000,encoding:'utf8',env:{...process.env,PGHOST:connection.hostname,PGPORT:connection.port||'5432',PGUSER:decodeURIComponent(connection.username),PGPASSWORD:decodeURIComponent(connection.password),PGDATABASE:database},stdio:['ignore','pipe','pipe']});}
+const toolVersion=run('pg_dump',['--version']);run('pg_restore',['--version']);
+// PostgreSQL may distribute varchar[] -> text[] casts on restore. Normalize only
+// that equivalent literal-array representation; retain all constraint operators.
+function canonical(rows){return rows.map(row=>Object.fromEntries(Object.entries(row).map(([key,value])=>[key,typeof value!=='string'?value:value.replace(/\(ARRAY\[([^\]]+)\]\)::text\[\]/g,(full,values)=>{const literals=values.match(/'(?:[^']|'')*'::character varying/g)??[];return literals.join(', ')===values?'ARRAY['+literals.map(value=>'('+value+')::text').join(', ')+']':full;})])));}
+const provisioner=new PrismaClient({datasourceUrl:connection.toString()});let source,target,runtime,sourceCreated=false,targetCreated=false;const started=Date.now();
+try{
+ await provisioner.$executeRawUnsafe(`CREATE DATABASE ${safe(sourceName)}`);sourceCreated=true;const sourceUrl=new URL(connection);sourceUrl.pathname='/'+sourceName;
+ execFileSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy','--schema',fileURLToPath(new URL('../../apps/api/prisma/schema.prisma',import.meta.url))],{windowsHide:true,timeout:60000,env:{...process.env,DATABASE_URL:sourceUrl.toString()},stdio:'pipe'});source=new PrismaClient({datasourceUrl:sourceUrl.toString()});
+ const {sealMfaSecret,openMfaSecret,generateTotpSecret}=require('../../apps/api/dist/security/mfa.js'),key=randomBytes(32),secret=generateTotpSecret();
+ const user=await source.user.create({data:{email:`restore-${suffix}@example.invalid`,displayName:'استعادة بيانات اختبار',passwordHash:'Fixture only; password sign-in disabled',emailVerifiedAt:new Date()}});const sealed=sealMfaSecret(key,secret,user.id,'USER');await source.user.update({where:{id:user.id},data:{mfaEnabled:true,mfaSecretEnc:sealed,mfaVersion:1}});
+ const orgs=[];for(let i=0;i<2;i++){const org=await source.organization.create({data:{name:'مؤسسة الاستعادة '+i,slug:'restore-'+suffix+'-'+i}}),member=await source.membership.create({data:{organizationId:org.id,userId:user.id,role:'ORGANIZATION_OWNER'}});await source.taskStatus.create({data:{organizationId:org.id,key:'NEW',nameAr:'جديدة',nameEn:'New',category:'OPEN',position:0}});await source.task.create({data:{organizationId:org.id,number:'RESTORE-001',title:'مهمة محفوظة '+i,createdById:member.id,assignedToId:member.id,tags:[],estimatedHours:'2.75'}});orgs.push(org);}
+ const dump=join(directory,'fixture.dump');run('pg_dump',['--format=custom','--no-owner','--file',dump],sourceName);const bytes=await readFile(dump),sha256=createHash('sha256').update(bytes).digest('hex');assert.ok(bytes.length>10000);assert.ok(run('pg_restore',['--list',dump]).includes('tasks'));
+ await provisioner.$executeRawUnsafe(`CREATE DATABASE ${safe(targetName)}`);targetCreated=true;run('pg_restore',['--exit-on-error','--no-owner','--dbname',targetName,dump],targetName);const targetUrl=new URL(connection);targetUrl.pathname='/'+targetName;target=new PrismaClient({datasourceUrl:targetUrl.toString()});
+ const tables=await source.$queryRawUnsafe("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"),tableChecks=[];
+ for(const {tablename} of tables){if(!/^[a-z_][a-z0-9_]*$/.test(tablename))throw new Error('Unexpected fixture table');const sql=`SELECT count(*)::text AS rows,md5(coalesce(string_agg(row_to_json(t)::text,E'\\n' ORDER BY row_to_json(t)::text),'')) AS checksum FROM public."${tablename}" t`;const before=await source.$queryRawUnsafe(sql),after=await target.$queryRawUnsafe(sql);assert.deepEqual(after,before,'Restored data mismatch: '+tablename);tableChecks.push({table:tablename,...before[0]});}
+ const schemaSql="SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity,coalesce(c.relacl::text,'') AS acl FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' ORDER BY c.relname";assert.deepEqual(await target.$queryRawUnsafe(schemaSql),await source.$queryRawUnsafe(schemaSql),'RLS or table grants mismatch');
+ const constraints="SELECT c.conrelid::regclass::text AS table_name,c.conname,c.contype,c.convalidated,c.conkey,c.confkey,CASE WHEN c.contype='c' THEN NULL ELSE pg_get_constraintdef(c.oid) END AS definition FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='public' ORDER BY table_name,c.conname";assert.deepEqual(canonical(await target.$queryRawUnsafe(constraints)),canonical(await source.$queryRawUnsafe(constraints)),'Constraints mismatch');
+ const policies="SELECT tablename,policyname,roles,cmd,qual,with_check FROM pg_policies WHERE schemaname='public' ORDER BY tablename,policyname";assert.deepEqual(canonical(await target.$queryRawUnsafe(policies)),canonical(await source.$queryRawUnsafe(policies)),'Policies mismatch');
+ // Check-expression formatting is not byte-stable across pg_dump/reparse.
+ // Compare their table/name/type/columns/validation state, then exercise key limits.
+ const task=await target.task.findFirstOrThrow({where:{organizationId:orgs[0].id}});await assert.rejects(target.task.update({where:{id:task.id},data:{estimatedHours:'-1'}}));
+ const otherMember=await target.membership.findFirstOrThrow({where:{organizationId:orgs[1].id}}),foreignProject=await target.project.create({data:{organizationId:orgs[1].id,number:'RESTORE-P-001',name:'Foreign tenant project',managerId:otherMember.id,createdById:otherMember.id}});await assert.rejects(target.task.update({where:{id:task.id},data:{projectId:foreignProject.id}}));
+ const restored=await target.user.findUniqueOrThrow({where:{id:user.id}});assert.equal(openMfaSecret(key,restored.mfaSecretEnc,user.id,'USER'),secret);
+ const runtimeUrl=new URL(process.env.DATABASE_URL);runtimeUrl.pathname='/'+targetName;runtime=new PrismaClient({datasourceUrl:runtimeUrl.toString()});await runtime.$transaction(async tx=>{await tx.$executeRaw`SELECT set_config('app.user_id',${user.id},true)`;await tx.$executeRaw`SELECT set_config('app.organization_id',${orgs[0].id},true)`;assert.equal(await tx.task.count(),1);assert.equal(await tx.task.count({where:{organizationId:orgs[1].id}}),0);});
+ const manifest={version:1,createdAt:new Date().toISOString(),fixtureOnly:true,toolVersion:toolVersion.trim(),archiveBytes:(await stat(dump)).size,sha256,tables:tableChecks.length,rows:tableChecks.reduce((sum,row)=>sum+Number(row.rows),0),checks:['all table row counts and content checksums','constraint identities, columns, validation and non-check definitions','negative numeric and cross-tenant constraint checks','table grants and FORCE RLS flags','row policies','MFA secret decrypts with separate key','restored runtime tenant isolation'],tableChecks,elapsedMs:Date.now()-started};await writeFile(join(directory,'manifest.json'),JSON.stringify(manifest,null,2)+'\n',{mode:0o600});console.log(JSON.stringify({...manifest,tableChecks:undefined,artifact:directory},null,2));
+}finally{if(runtime)await runtime.$disconnect();if(target)await target.$disconnect();if(source)await source.$disconnect();if(targetCreated)await provisioner.$executeRawUnsafe(`DROP DATABASE ${safe(targetName)} WITH (FORCE)`);if(sourceCreated)await provisioner.$executeRawUnsafe(`DROP DATABASE ${safe(sourceName)} WITH (FORCE)`);await provisioner.$disconnect();}

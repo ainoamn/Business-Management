@@ -1,3 +1,6 @@
+import {environment} from '../config/environment';
+import {createPaymentProvider} from '../billing/payment.factory';
+import {UnconfiguredPaymentProvider} from '../billing/payment-provider';
 import {BadRequestException,ConflictException,Injectable,NotFoundException,ServiceUnavailableException,UnauthorizedException} from '@nestjs/common';
 import {Prisma} from '@prisma/client';
 import {platformAccountSchema,platformAccountUpdateSchema,platformDisabledSchema,platformInvoiceSchema,platformLedgerSchema,platformPageSchema,platformPlanSchema,platformRoleSchema,platformSettingsSchema,platformSubscriptionSchema,platformUserSchema,contactSchema,type PlatformPermission,type PlatformResource,type PlatformQuery} from '@work/shared-schemas';
@@ -14,6 +17,10 @@ const accountSelect={id:true,email:true,displayName:true,isOwner:true,disabledAt
 @Injectable()
 export class PlatformService {
   constructor(private readonly db:PrismaService,private readonly mail:MailService) {}
+  async integrationStatus(actor:PlatformActor){
+    authorize(actor,'monitoring.read');const ai=await this.db.aiProvider.count({where:{active:true}});
+    return {payments:createPaymentProvider(environment) instanceof UnconfiguredPaymentProvider?'NOT_CONFIGURED':'CONFIGURED',email:environment.MAIL_DELIVERY_MODE==='smtp'&&environment.SMTP_URL&&environment.SMTP_FROM?'CONFIGURED':environment.DEPLOYMENT_ENV==='development'&&environment.MAIL_DELIVERY_MODE==='outbox'?'DEVELOPMENT_OUTBOX':'NOT_CONFIGURED',ai:ai>0?'CONFIGURED':'NOT_CONFIGURED'};
+  }
   private async audit(tx:Prisma.TransactionClient,actor:PlatformActor,requestId:string,action:string,resource:string,id?:string) {
     await tx.platformAudit.create({data:{actorId:actor.id,requestId,action,resource,resourceId:id}});
   }

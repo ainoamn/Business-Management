@@ -1,4 +1,4 @@
-import {createCipheriv,createDecipheriv,createHmac,randomBytes} from 'node:crypto';
+import {createCipheriv,createDecipheriv,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 
 /**
  * MFA credential encryption key (32 bytes).
@@ -69,22 +69,31 @@ export function generateTotpCode(secret:string,time:number=Date.now()):string{
  * Verify TOTP code (checks current window ±1).
  */
 export function verifyTotpCode(secret:string,code:string,time:number=Date.now()):boolean{
-  if(!/^\d{6}$/.test(code))return false;
+  return matchingTotpCounter(secret,code,time)!==null;
+}
+
+export function normalizeMfaCode(code:string){
+  return code.trim().replace(/[٠-٩۰-۹]/g,value=>String(value.charCodeAt(0)-(value>='۰'?0x6f0:0x660))).replace(/[\s-]/g,'').toUpperCase();
+}
+
+export function matchingTotpCounter(secret:string,code:string,time:number=Date.now()):bigint|null{
+  code=normalizeMfaCode(code);
+  if(!/^\d{6}$/.test(code))return null;
   for(const offset of [-1,0,1]){
     const testTime=time+offset*30000;
-    if(generateTotpCode(secret,testTime)===code)return true;
+    if(testTime>=0&&timingSafeEqual(Buffer.from(generateTotpCode(secret,testTime)),Buffer.from(code)))return BigInt(Math.floor(testTime/30000));
   }
-  return false;
+  return null;
 }
 
 /**
- * Generate recovery codes (8 codes, 10 characters each).
+ * Eight independent 128-bit recovery codes, displayed in readable groups.
  */
 export function generateRecoveryCodes():string[]{
   const codes:string[]=[];
   for(let i=0;i<8;i++){
-    const bytes=randomBytes(5);
-    codes.push(bytes.toString('hex').toUpperCase());
+    const bytes=randomBytes(16);
+    codes.push(bytes.toString('hex').toUpperCase().match(/.{8}/g)!.join('-'));
   }
   return codes;
 }
@@ -93,7 +102,7 @@ export function generateRecoveryCodes():string[]{
  * Hash recovery code for storage.
  */
 export function hashRecoveryCode(code:string):string{
-  return createHmac('sha256',Buffer.from('recovery-code-v1')).update(code).digest('hex');
+  return createHmac('sha256',Buffer.from('recovery-code-v1')).update(normalizeMfaCode(code)).digest('hex');
 }
 
 /**

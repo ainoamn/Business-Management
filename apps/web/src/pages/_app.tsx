@@ -1,3 +1,4 @@
+import '../bhd-switcher.css';
 import type { AppProps } from 'next/app';
 import '../styles/globals.css';
 import '../styles/platform.css';

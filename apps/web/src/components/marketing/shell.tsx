@@ -4,6 +4,7 @@ import { Button } from '@work/ui';
 import type { Locale } from '@work/shared-types';
 import { marketingDictionary } from '../../i18n/marketing';
 import { usePlatformBrand } from '../../hooks/use-platform-brand';
+import { BhdProgramsFooter } from '../bhd/BhdProgramsFooter';
 
 interface MarketingShellProps {
   children: React.ReactNode;
@@ -65,6 +66,9 @@ export function MarketingShell({ children }: MarketingShellProps) {
         </nav>
 
         <div className="marketing-actions">
+          <Link href="/api/auth/bhd/start?returnTo=%2Fapp%2Fdashboard" className="button button-ghost">
+            {locale === 'ar' ? 'دخول BHD' : 'BHD sign-in'}
+          </Link>
           <Link href="/login" className="button button-ghost">
             {t.login}
           </Link>
@@ -111,6 +115,7 @@ export function MarketingShell({ children }: MarketingShellProps) {
             <Link href="/security">{t.security}</Link>
           </div>
         </div>
+        <BhdProgramsFooter locale={locale} />
         <div className="marketing-footer-bottom">
           <span>{brand?.platformName ?? 'Work Management Platform'} © {new Date().getFullYear()}</span>
           <span dir="ltr">Oman</span>

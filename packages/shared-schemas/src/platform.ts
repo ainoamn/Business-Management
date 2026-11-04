@@ -6,7 +6,7 @@ export const platformPermissions = [
   'accounts.read','accounts.manage','roles.read','roles.manage','plans.read','plans.manage',
   'subscriptions.read','subscriptions.manage','invoices.read','invoices.manage','ledger.read','ledger.manage',
   'pages.read','pages.manage','audit.read','settings.read','settings.manage','security.read','security.manage','monitoring.read',
-  'ai.read','ai.manage',
+  'ai.read','ai.manage','storage.read','support.read','support.manage',
   'billing.read','billing.manage','coupons.read','coupons.manage','payments.read','payments.manage',
 ] as const;
 export type PlatformPermission = typeof platformPermissions[number];

@@ -30,8 +30,10 @@ export class BillingPublicController{
 export class BillingWorkController{
  constructor(private readonly billing:BillingService,private readonly identity:IdentityService){}
  @Get('status') status(@Param('organizationId') org:string,@Req() r:WorkRequest){return this.billing.status(r.workIdentity,uuid(org));}
+ @Get('invoices') invoices(@Param('organizationId') org:string,@Query() query:unknown,@Req() r:WorkRequest){return this.billing.invoices(r.workIdentity,uuid(org),validate(workQuerySchema,query));}
  @Get('orders') orders(@Param('organizationId') org:string,@Query() query:unknown,@Req() r:WorkRequest){return this.billing.orders(r.workIdentity,uuid(org),validate(workQuerySchema,query));}
  @Get('orders/:id') order(@Param('organizationId') org:string,@Param('id') id:string,@Req() r:WorkRequest){return this.billing.detail(r.workIdentity,uuid(org),uuid(id));}
+ @Post('orders/:id/payment') payment(@Param('organizationId') org:string,@Param('id') id:string,@Body() body:unknown,@Req() r:WorkRequest,@Res({passthrough:true}) response:Response){return this.billing.resumePayment(r.workIdentity,uuid(org),uuid(id),body,trace(response));}
  @Get('history') history(@Param('organizationId') org:string,@Query() query:unknown,@Req() r:WorkRequest){return this.billing.history(r.workIdentity,uuid(org),validate(workQuerySchema,query));}
  @Post('quotes') async quote(@Param('organizationId') org:string,@Body() body:unknown,@Req() r:WorkRequest,@Res({passthrough:true}) response:Response){await this.identity.limit('BILLING_QUOTE',r.workIdentity.id,r,{identity:30,ip:100});return this.billing.quote(r.workIdentity,uuid(org),body,trace(response));}
  @Post('checkout') async checkout(@Param('organizationId') org:string,@Body() body:unknown,@Req() r:WorkRequest,@Res({passthrough:true}) response:Response){await this.identity.limit('BILLING_CHECKOUT',r.workIdentity.id,r,{identity:30,ip:100});return this.billing.checkout(r.workIdentity,uuid(org),body,trace(response));}

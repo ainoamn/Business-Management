@@ -1,3 +1,3 @@
 import {useRouter} from 'next/router';
 import {PlatformConsole} from '../../components/platform/console';
-export default function PlatformPage() {const router=useRouter();const section=Array.isArray(router.query.section)?router.query.section[0]:undefined;return <PlatformConsole section={section??'overview'}/>;}
+export default function PlatformPage() {const router=useRouter();const section=Array.isArray(router.query.section)?router.query.section[0]:undefined;const aliases:Record<string,string>={dashboard:'overview',payments:'ledger','audit-logs':'audit','ai-usage':'ai'};return <PlatformConsole key={section??'overview'} section={aliases[section??'']??section??'overview'} initialAiTab={section==='ai-usage'?'usage':undefined} supportCaseId={Array.isArray(router.query.section)?router.query.section[1]:undefined}/>;}

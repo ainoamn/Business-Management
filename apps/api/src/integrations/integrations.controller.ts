@@ -1,5 +1,5 @@
 import {Body,Controller,Delete,Get,Param,Post,Req,UseGuards} from '@nestjs/common';
-import {organizationIdSchema} from '@work/shared-schemas';
+import {organizationIdSchema,integrationKindSchema} from '@work/shared-schemas';
 import {validate} from '../common/validation';
 import {WorkGuard,type WorkRequest} from '../work/work.guard';
 import {IntegrationsService,type IntegrationKind} from './integrations.service';
@@ -23,7 +23,7 @@ export class IntegrationsController {
     @Param('kind')kind:IntegrationKind,
     @Body()body:unknown
   ){
-    return this.integrations.connect(request.workIdentity,uuid(organizationId),kind,body);
+    return this.integrations.connect(request.workIdentity,uuid(organizationId),validate(integrationKindSchema,kind),body);
   }
 
   @Delete(':kind')
@@ -32,6 +32,6 @@ export class IntegrationsController {
     @Param('organizationId')organizationId:string,
     @Param('kind')kind:IntegrationKind
   ){
-    return this.integrations.disconnect(request.workIdentity,uuid(organizationId),kind);
+    return this.integrations.disconnect(request.workIdentity,uuid(organizationId),validate(integrationKindSchema,kind));
   }
 }
