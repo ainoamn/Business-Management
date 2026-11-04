@@ -16,6 +16,9 @@ model User {
   disabledAt   DateTime?    @map("disabled_at") @db.Timestamptz(3)
   username String? @unique @db.VarChar(40)
   emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  mfaEnabled Boolean @default(false) @map("mfa_enabled")
+  mfaSecretEnc String? @map("mfa_secret_enc")
+  mfaVerifiedAt DateTime? @map("mfa_verified_at") @db.Timestamptz(3)
   actionTokens UserActionToken[]
   aiRequests AiRequest[]
   memberships Membership[]
@@ -80,6 +83,7 @@ model Organization {
   aiMessages AiMessage[]
   aiDrafts AiDraft[]
   aiAudit AiAudit[]
+  integrations OrganizationIntegration[]
   @@map("organizations")
 }
 
@@ -169,6 +173,9 @@ model PlatformAccount {
   isOwner Boolean @default(false) @map("is_owner")
   disabledAt DateTime? @map("disabled_at") @db.Timestamptz(3)
   roleId String? @map("role_id") @db.Uuid
+  mfaEnabled Boolean @default(false) @map("mfa_enabled")
+  mfaSecretEnc String? @map("mfa_secret_enc")
+  mfaVerifiedAt DateTime? @map("mfa_verified_at") @db.Timestamptz(3)
   role PlatformRole? @relation(fields:[roleId],references:[id],onDelete:Restrict)
   sessions PlatformSession[]
   aiPromptVersions AiPromptVersion[]
@@ -419,7 +426,7 @@ model BillingTrialUse {
   organizationId String @id @map("organization_id") @db.Uuid
   organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
   membershipId String @map("membership_id") @db.Uuid
-  userId String @map("user_id") @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
   membership Membership @relation(fields:[organizationId,membershipId,userId],references:[organizationId,id,userId],onDelete:Restrict)
   planId String @map("plan_id") @db.Uuid
   plan PlatformPlan @relation(fields:[planId],references:[id],onDelete:Restrict)
@@ -1027,6 +1034,9 @@ model NotificationPreference {
   inAppEnabled Boolean @default(true) @map("in_app_enabled")
   emailEnabled Boolean @default(false) @map("email_enabled")
   remindersEnabled Boolean @default(true) @map("reminders_enabled")
+  smsEnabled Boolean @default(false) @map("sms_enabled")
+  whatsappEnabled Boolean @default(false) @map("whatsapp_enabled")
+  pushEnabled Boolean @default(false) @map("push_enabled")
   organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
   @@id([organizationId,membershipId])
   @@map("notification_preferences")
@@ -1877,7 +1887,7 @@ model AiAudit {
  @@map("ai_audit")
 }
 model AiProviderReceipt {
- requestId String @id @map("request_id") @db.Uuid
+  requestId String @id @map("request_id") @db.Uuid
  organizationId String @map("organization_id") @db.Uuid
  membershipId String @map("membership_id") @db.Uuid
  outcome String @db.VarChar(20)
@@ -1892,4 +1902,53 @@ model AiProviderReceipt {
  @@unique([organizationId,requestId,membershipId])
  @@index([organizationId,membershipId,createdAt])
  @@map("ai_provider_receipts")
+}
+
+model MfaRecoveryCode {
+  id String @id @default(uuid()) @db.Uuid
+  accountType String @map("account_type") @db.VarChar(10)
+  accountId String @map("account_id") @db.Uuid
+  codeHash String @map("code_hash") @db.VarChar(64)
+  usedAt DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([accountType,accountId])
+  @@index([codeHash])
+  @@map("mfa_recovery_codes")
+}
+
+model PendingMfaChallenge {
+  id String @id @default(uuid()) @db.Uuid
+  accountType String @map("account_type") @db.VarChar(10)
+  accountId String @map("account_id") @db.Uuid
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([accountType,accountId])
+  @@index([expiresAt])
+  @@map("pending_mfa_challenges")
+}
+
+model PushSubscription {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+  endpoint String @db.VarChar(1000)
+  keysJson String @map("keys_json")
+  userAgent String @default("") @map("user_agent") @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@unique([organizationId,membershipId,endpoint])
+  @@map("push_subscriptions")
+}
+
+model OrganizationIntegration {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  kind String @db.VarChar(40)
+  status String @default("DISCONNECTED") @db.VarChar(20)
+  configEnc String? @map("config_enc")
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@unique([organizationId,kind])
+  @@map("organization_integrations")
 }

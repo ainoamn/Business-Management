@@ -1,7 +1,7 @@
 import {Body,Controller,Get,Param,Patch,Post,Query,Req,Res,UseGuards} from '@nestjs/common';
 import {ApiTags} from '@nestjs/swagger';
 import type {Request,Response} from 'express';
-import {organizationIdSchema,platformLoginSchema,platformPasswordChangeSchema,platformQuerySchema,platformResourceSchema} from '@work/shared-schemas';
+import {organizationIdSchema,platformLoginSchema,platformPasswordChangeSchema,platformQuerySchema,platformResourceSchema,contactSchema} from '@work/shared-schemas';
 import {PlatformAuth,PlatformGuard,type PlatformRequest} from './platform.auth';
 import {PlatformService} from './platform.service';
 import {csrfFor} from './security';
@@ -66,4 +66,8 @@ export class PublicSiteController {
   site() {return this.service.site();}
   @Get('pages/:slug')
   page(@Param('slug') slug:string) {return this.service.publicPage(slug);}
+  @Post('contact')
+  contact(@Body() body:unknown) {return this.service.contact(validate(contactSchema,body));}
+  @Get('billing/plans')
+  plans() {return this.service.plans();}
 }

@@ -1,3 +1,4 @@
+import {billingFeatureLabel} from '../../i18n/billing';
 import {useEffect,useState} from 'react';
 import {billingFeatures} from '@work/shared-schemas';
 import type {PlatformSessionView} from '@work/shared-types';
@@ -7,8 +8,6 @@ import {AdminDialog,errorLabel} from './forms';
 import {ConfigurationForm,type ConfigurationField} from './configuration-form';
 import {permitted} from './resources';
 type Row=Record<string,unknown>&{id:string;version:number};
-const featureNames:Record<string,[string,string]>={TASKS:['المهام','Tasks'],PROJECTS:['المشاريع','Projects'],CALENDAR:['التقويم','Calendar'],DOCUMENTS:['الملفات','Files'],NOTIFICATIONS:['التنبيهات','Notifications'],AI_BASIC:['مساعدة ذكية أساسية','Basic AI'],AUTOMATION:['الأتمتة','Automation'],TEAMS:['الفرق','Teams'],TIME:['تسجيل الوقت','Time tracking'],BUDGETS:['الميزانيات','Budgets'],ADVANCED_REPORTS:['تقارير متقدمة','Advanced reports'],AI_ADVANCED:['مساعدة ذكية متقدمة','Advanced AI'],ADVANCED_PERMISSIONS:['صلاحيات متقدمة','Advanced permissions'],PORTFOLIOS:['محافظ المشاريع','Portfolios'],API:['الوصول إلى API','API access'],INTEGRATIONS:['التكاملات','Integrations'],SSO:['الدخول المؤسسي الموحد','Enterprise SSO'],PRIVATE_HOSTING:['خيار استضافة خاصة','Private hosting option']};
-export function billingFeatureLabel(locale:'ar'|'en',key:string){return featureNames[key]?.[locale==='ar'?0:1]??key;}
 export function BillingAdminPanel({t,session,locale,initialTab='plans'}:{t:PlatformText;session:PlatformSessionView;locale:'ar'|'en';initialTab?:string}){
  const d=(ar:string,en:string)=>locale==='ar'?ar:en,names:Record<string,string>={plans:d('الباقات والأسعار والحدود','Plans, prices and limits'),settings:d('التجربة وتعليمات السداد','Trial and payment instructions'),coupons:d('قسائم الخصم','Discount coupons')},permissions:Record<string,string>={plans:'plans',settings:'billing',coupons:'coupons'};
  const tabs=Object.keys(names).filter(key=>permitted(session,`${permissions[key]}.read`));const [tab,setTab]=useState(tabs.includes(initialTab)?initialTab:tabs[0]??'settings'),[page,setPage]=useState(1),[search,setSearch]=useState(''),[query,setQuery]=useState(''),[revision,setRevision]=useState(0),[rows,setRows]=useState<Row[]>([]),[total,setTotal]=useState(0),[settings,setSettings]=useState<Row>(),[plans,setPlans]=useState<Row[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[editing,setEditing]=useState<Row|null|undefined>();const manage=permitted(session,`${permissions[tab]}.manage`),reload=()=>setRevision(value=>value+1);

@@ -1,10 +1,11 @@
 import {BadRequestException,ConflictException,Injectable,NotFoundException,ServiceUnavailableException,UnauthorizedException} from '@nestjs/common';
 import {Prisma} from '@prisma/client';
-import {platformAccountSchema,platformAccountUpdateSchema,platformDisabledSchema,platformInvoiceSchema,platformLedgerSchema,platformPageSchema,platformPlanSchema,platformRoleSchema,platformSettingsSchema,platformSubscriptionSchema,platformUserSchema,type PlatformPermission,type PlatformResource,type PlatformQuery} from '@work/shared-schemas';
+import {platformAccountSchema,platformAccountUpdateSchema,platformDisabledSchema,platformInvoiceSchema,platformLedgerSchema,platformPageSchema,platformPlanSchema,platformRoleSchema,platformSettingsSchema,platformSubscriptionSchema,platformUserSchema,contactSchema,type PlatformPermission,type PlatformResource,type PlatformQuery} from '@work/shared-schemas';
 import type {PlatformActor,PlatformList,PlatformRow} from '@work/shared-types';
 import {PrismaService} from '../database/prisma.service';
 import {authorize,validate} from './validation';
 import {hashPassword,permissionsFor,verifyPassword} from './security';
+import {MailService} from '../mail/mail.service';
 
 type Query=PlatformQuery;
 type OrganizationRow={id:string;name:string;slug:string;suspended_at:Date|null;created_at:Date;total_count:bigint};
@@ -12,7 +13,7 @@ const accountSelect={id:true,email:true,displayName:true,isOwner:true,disabledAt
 
 @Injectable()
 export class PlatformService {
-  constructor(private readonly db:PrismaService) {}
+  constructor(private readonly db:PrismaService,private readonly mail:MailService) {}
   private async audit(tx:Prisma.TransactionClient,actor:PlatformActor,requestId:string,action:string,resource:string,id?:string) {
     await tx.platformAudit.create({data:{actorId:actor.id,requestId,action,resource,resourceId:id}});
   }
@@ -72,7 +73,7 @@ export class PlatformService {
       }
       case 'subscriptions': {
         const where=search?{status:contains}:{};const rows=await this.db.platformSubscription.findMany({where,...options,orderBy:{createdAt:'desc'}});
-        items=rows.map(row=>({...row,unitPrice:row.unitPrice.toFixed(3),periodStart:row.periodStart.toISOString(),canceledAt:row.canceledAt?.toISOString()??null,graceEndsAt:row.graceEndsAt?.toISOString()??null,endsAt:row.endsAt.toISOString(),createdAt:row.createdAt.toISOString()}));total=await this.db.platformSubscription.count({where});break;
+        items=rows.map(row=>({...row,unitPrice:row.unitPrice.toFixed(3),periodStart:row.periodStart.toISOString(),usageAnchorAt:row.usageAnchorAt.toISOString(),canceledAt:row.canceledAt?.toISOString()??null,graceEndsAt:row.graceEndsAt?.toISOString()??null,endsAt:row.endsAt.toISOString(),createdAt:row.createdAt.toISOString()}));total=await this.db.platformSubscription.count({where});break;
       }
       case 'invoices': {
         const where={number:contains};const rows=await this.db.platformInvoice.findMany({where,...options,orderBy:{createdAt:'desc'}});
@@ -228,5 +229,17 @@ export class PlatformService {
     const page=await this.db.platformPage.findUnique({where:{slug},select:{title:true,body:true,status:true}});
     if(!page||page.status!=='PUBLISHED') throw new NotFoundException('Page not found');
     return {title:page.title,body:page.body,platformName:site.platformName,footerText:site.footerText};
+  }
+  async contact(data:ReturnType<typeof contactSchema.parse>) {
+    const settings=await this.db.platformSettings.findUnique({where:{id:'main'}});
+    if(!settings?.supportEmail) throw new ServiceUnavailableException('Support email not configured');
+    await this.db.$transaction(async tx=>{
+      await this.mail.enqueue(tx,{recipient:settings.supportEmail,subject:`Contact form: ${data.name}`,textBody:`Name: ${data.name}\nEmail: ${data.email}\n\n${data.message}`});
+    });
+    return {ok:true};
+  }
+  async plans() {
+    const rows=await this.db.platformPlan.findMany({where:{active:true},orderBy:{price:'asc'}});
+    return rows.map(row=>({id:row.id,name:row.name,description:row.description,price:row.price.toFixed(3),maxSeats:row.maxSeats,storageMb:row.storageMb,aiCredits:row.aiCredits,active:row.active}));
   }
 }

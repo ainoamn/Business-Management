@@ -1,0 +1,117 @@
+name: work-management-production
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:?}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../infrastructure/docker/postgres-init.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
+    networks: [backend]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?}
+    command: ['sh', '-c', 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    volumes: [redis-data:/data]
+    networks: [backend]
+    healthcheck:
+      test: ['CMD-SHELL', 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  storage:
+    image: chrislusf/seaweedfs:4.51
+    command: mini -dir=/data -s3.port=8333
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?}
+      S3_BUCKET: ${S3_BUCKET:?}
+    volumes: [storage-data:/data]
+    networks: [backend]
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8333/status']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  clamav:
+    image: clamav/clamav:1.4
+    volumes: [clamav-data:/var/lib/clamav]
+    networks: [backend]
+    healthcheck:
+      test: ['CMD', '/usr/local/bin/clamd', '--ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?}
+      REDIS_URL: ${REDIS_URL:?}
+      S3_ENDPOINT: http://storage:8333
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+      S3_BUCKET: ${S3_BUCKET:?}
+      S3_REGION: us-east-1
+      WEB_ORIGIN: ${WEB_ORIGIN:?}
+      AI_CREDENTIAL_KEY: ${AI_CREDENTIAL_KEY:?}
+      MAIL_FROM: ${MAIL_FROM:?}
+      MAIL_DELIVERY_MODE: ${MAIL_DELIVERY_MODE:-smtp}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      storage: {condition: service_healthy}
+      clamav: {condition: service_healthy}
+    networks: [backend, frontend]
+    ports: ['127.0.0.1:3000:3000']
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:?}
+    networks: [frontend]
+    ports: ['80:80']
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  storage-data:
+  clamav-data:
+
+networks:
+  backend:
+    driver: bridge
+  frontend:
+    driver: bridge

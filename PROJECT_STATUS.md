@@ -2,7 +2,16 @@
 
 ## النشر
 
-المصدر مرفوع إلى https://github.com/ainoamn/Business-Management. واجهة Next.js منشورة على https://business-management-sigma.vercel.app. الخادم وPostgreSQL وRedis وS3 غير مستضافين على Vercel، لذلك الصفحة العامة تعرض الخدمات غير الجاهزة إلى أن يُضبط `API_ORIGIN`. التفاصيل في docs/deployment/vercel.md. مطابقة الأمر الهندسي في docs/product/plan-compliance.md: الخطة لم تُنفَّذ كاملة.
+المصدر مرفوع إلى https://github.com/ainoamn/Business-Management. واجهة Next.js منشورة على https://business-management-sigma.vercel.app. الخادم وPostgreSQL وRedis وS3 غير مستضافين على Vercel، لذلك الصفحة العامة تعرض الخدمات غير الجاهزة إلى أن يُضبط `API_ORIGIN`. التفاصيل في docs/deployment/vercel.md. مطابقة الأمر الهندسي في docs/product/plan-compliance.md.
+
+## تحديث 2026-11-04 — الإكمال التشغيلي للكود
+
+- صفحات تسويقية وقانونية مستقلة مع نموذج اتصل بنا عبر البريد (outbox/SMTP).
+- اشتراك المؤسسة: عروض وفواتير يدوية، ومسار مزود دفع hosted مع ويب هوك عند ضبط `PAYMENT_*`.
+- MFA (TOTP) للمستخدمين ومشرفي المنصة مع تحدي دخول وواجهة أمان.
+- تفضيلات SMS/WhatsApp/Push وقنوات غير مهيأة صراحةً؛ تكاملات Calendar/Drive/Teams/SSO كواجهات NOT_CONFIGURED.
+- ClamAV في Compose، وDockerfiles، وcompose إنتاجي، واختبارات أداء/استعادة، ومسودات `docs/legal`.
+- ما زال مطلوباً للإنتاج الحي: استضافة API+DB، مفاتيح المزودين، ومراجعة قانونية.
 
 ## الحالة الحالية
 

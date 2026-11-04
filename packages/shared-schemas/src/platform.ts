@@ -34,3 +34,4 @@ export const platformSettingsSchema=z.object({platformName:name,supportEmail:ema
 export const platformDisabledSchema=z.object({disabled:z.boolean()}).strict();
 export const platformUserSchema=z.object({displayName:name,disabled:z.boolean()}).strict();
 export const platformPasswordChangeSchema=z.object({currentPassword:z.string().min(1).max(128),newPassword:platformPasswordSchema}).strict();
+export const contactSchema=z.object({name:name,email,message:z.string().trim().min(10).max(5000)}).strict();

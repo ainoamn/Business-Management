@@ -27,6 +27,8 @@
     "test:platform:browser": "node tests/browser/platform.verify.mjs",
     "test:e2e": "dotenv -e .env -- playwright test",
     "test:ui": "playwright test --config playwright.ui.config.ts",
+    "test:perf": "node tests/performance/smoke.mjs",
+    "test:restore": "node tests/restore/restore-drill.mjs",
     "dev": "dotenv -e .env -- concurrently -k -n api,web \"pnpm --filter @work/api dev\" \"pnpm --filter @work/web dev\"",
     "start:api": "dotenv -e .env -- pnpm --filter @work/api start",
     "start:web": "pnpm --filter @work/web start",

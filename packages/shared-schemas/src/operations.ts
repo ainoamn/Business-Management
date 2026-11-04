@@ -2,7 +2,7 @@ import {z} from 'zod';
 import {workQuerySchema} from './work';
 const uuid=z.string().uuid().toLowerCase(),date=z.string().datetime({offset:true});
 export const calendarDateSchema=z.iso.date();
-export const notificationPreferencesSchema=z.object({inAppEnabled:z.boolean(),emailEnabled:z.boolean(),remindersEnabled:z.boolean()}).strict();
+export const notificationPreferencesSchema=z.object({inAppEnabled:z.boolean(),emailEnabled:z.boolean(),remindersEnabled:z.boolean(),smsEnabled:z.boolean().default(false),whatsappEnabled:z.boolean().default(false),pushEnabled:z.boolean().default(false)}).strict();
 export const timeQuerySchema=workQuerySchema.extend({membershipId:uuid.optional(),taskId:uuid.optional(),projectId:uuid.optional(),from:date.optional(),to:date.optional()}).strict();
 export type TimeQuery=z.infer<typeof timeQuerySchema>;
 export const timeEntrySchema=z.object({taskId:uuid,membershipId:uuid.optional(),startedAt:date,endedAt:date,description:z.string().trim().max(2000).default('')}).strict().refine(data=>new Date(data.endedAt)>new Date(data.startedAt)&&new Date(data.endedAt).getTime()-new Date(data.startedAt).getTime()<=86400000,{message:'Time entry must be between one second and 24 hours'});

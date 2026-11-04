@@ -38,11 +38,22 @@ services:
     ports: ['127.0.0.1:59000:8333']
     volumes: ['storage-data:/data']
     healthcheck:
-      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:9333/cluster/status']
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8333/status']
       interval: 5s
       timeout: 3s
       retries: 20
+  clamav:
+    image: clamav/clamav:1.4
+    ports: ['127.0.0.1:3310:3310']
+    volumes: ['clamav-data:/var/lib/clamav']
+    healthcheck:
+      test: ['CMD', '/usr/local/bin/clamd', '--ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 volumes:
   postgres-data:
   redis-data:
   storage-data:
+  clamav-data:

@@ -30,7 +30,7 @@ export function Foundation() {
     <div className="shell">
       <header className="header">
         <a className="brand" href="/"><span className="brand-mark" aria-hidden="true">W<span>•</span></span><span><strong>{brand?.platformName??t.title}</strong><small>{t.subtitle}</small></span></a>
-        <div className="header-actions"><Link href="/app/dashboard" className="button button-ghost">{locale==='ar'?'مساحة العمل':'Workspace'}</Link><Link href="/register" className="button button-ghost">{locale==='ar'?'إنشاء حساب':'Create account'}</Link><Link href="/platform" className="button button-ghost">{t.admin}</Link><Button className="button-ghost" onClick={toggleLocale}>{t.language}</Button><Button className="button-icon button-ghost" aria-label={t.theme} onClick={toggleTheme}>{dark?'☀':'☾'}</Button></div>
+        <div className="header-actions"><Link href="/features" className="button button-ghost">{locale==='ar'?'المميزات':'Features'}</Link><Link href="/pricing" className="button button-ghost">{locale==='ar'?'الأسعار':'Pricing'}</Link><Link href="/about" className="button button-ghost">{locale==='ar'?'من نحن':'About'}</Link><Link href="/help" className="button button-ghost">{locale==='ar'?'المساعدة':'Help'}</Link><Link href="/app/dashboard" className="button button-ghost">{locale==='ar'?'مساحة العمل':'Workspace'}</Link><Link href="/register" className="button button-ghost">{locale==='ar'?'إنشاء حساب':'Create account'}</Link><Link href="/platform" className="button button-ghost">{t.admin}</Link><Button className="button-ghost" onClick={toggleLocale}>{t.language}</Button><Button className="button-icon button-ghost" aria-label={t.theme} onClick={toggleTheme}>{dark?'☀':'☾'}</Button></div>
       </header>
       <main>
         <div className="hero">
@@ -59,7 +59,7 @@ export function Foundation() {
         </div>
         <section className="development-note"><div><h2>{t.honest}</h2><p>{t.honestDescription}</p></div><div className="text-links"><a href="/api/docs/" target="_blank" rel="noreferrer">{t.api} ↗</a><a href="/api/v1/health/live" target="_blank" rel="noreferrer">{t.live} ↗</a></div></section>
       </main>
-      <footer><span>{t.title}</span><span>{t.footer}</span><span dir="ltr">v0.1.0</span></footer>
+      <footer><span>{t.title}</span><div className="footer-links"><Link href="/privacy">{locale==='ar'?'الخصوصية':'Privacy'}</Link><Link href="/terms">{locale==='ar'?'الشروط':'Terms'}</Link><Link href="/security">{locale==='ar'?'الأمان':'Security'}</Link></div><span>{t.footer}</span><span dir="ltr">v0.1.0</span></footer>
     </div>
   </>;
 }

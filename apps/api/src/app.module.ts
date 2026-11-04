@@ -1,4 +1,10 @@
-import {BillingPlatformController,BillingPublicController} from './billing/billing.controller';
+import {BillingWorkerService} from './billing/billing-worker.service';
+import {BillingService} from './billing/billing.service';
+import {BillingWebhookController} from './billing/billing-webhook.controller';
+import {createPaymentProvider,PAYMENT_PROVIDER} from './billing/payment.factory';
+import {environment} from './config/environment';
+import {BillingEntitlementsService} from './billing/billing-entitlements.service';
+import {BillingPlatformController,BillingPublicController,BillingWorkController} from './billing/billing.controller';
 import {BillingConfigurationService} from './billing/billing-configuration.service';
 import {AiDraftsService} from './ai/ai-drafts.service';
 import { Module } from '@nestjs/common';
@@ -51,5 +57,10 @@ import {AiQuotaService} from './ai/ai-quota.service';
 import {AiRequestService} from './ai/ai-request.service';
 import {AiSettlementService} from './ai/ai-settlement.service';
 import {AiPlatformController,AiWorkController} from './ai/ai.controller';
-@Module({controllers:[HealthController,BillingPlatformController,BillingPublicController,AiPlatformController,AiWorkController,PlatformController,PlatformLoginController,PublicSiteController,WorkController,WorkPublicController,ExecutionController,OperationsController,MeetingController,RequestController,FinanceController,DocumentController,WorkflowController,SearchController,ReportController],providers:[PrismaService,RedisService,QueueService,StorageService,HealthService,PlatformAuth,PlatformGuard,PlatformService,MailService,IdentityService,WorkGuard,OrganizationService,ExecutionService,NotificationService,TimeService,MeetingService,RequestService,FinanceService,DocumentStorageService,DocumentAccessService,DocumentService,DocumentUploadInterceptor,WorkflowService,WorkflowResourcesService,WorkflowActorsService,WorkflowSchedulesService,WorkflowEngineService,SearchService,ReportService,ReportExportService,AiConfigurationService,AiCredentialsService,AiContextService,AiDocumentTextService,AiQuotaService,AiRequestService,AiSettlementService,AiDraftsService,BillingConfigurationService]})
+import {MfaService} from './security/mfa.service';
+import {WorkMfaController,PlatformMfaController,AuthMfaController} from './security/mfa.controller';
+import {NotificationChannelProviders} from './notifications/channel-providers';
+import {IntegrationsService} from './integrations/integrations.service';
+import {IntegrationsController} from './integrations/integrations.controller';
+@Module({controllers:[HealthController,BillingPlatformController,BillingPublicController,BillingWorkController,BillingWebhookController,AiPlatformController,AiWorkController,PlatformController,PlatformLoginController,PublicSiteController,WorkController,WorkPublicController,ExecutionController,OperationsController,MeetingController,RequestController,FinanceController,DocumentController,WorkflowController,SearchController,ReportController,WorkMfaController,PlatformMfaController,AuthMfaController,IntegrationsController],providers:[PrismaService,RedisService,QueueService,StorageService,HealthService,PlatformAuth,PlatformGuard,PlatformService,MailService,IdentityService,WorkGuard,OrganizationService,ExecutionService,NotificationService,TimeService,MeetingService,RequestService,FinanceService,DocumentStorageService,DocumentAccessService,DocumentService,DocumentUploadInterceptor,WorkflowService,WorkflowResourcesService,WorkflowActorsService,WorkflowSchedulesService,WorkflowEngineService,SearchService,ReportService,ReportExportService,AiConfigurationService,AiCredentialsService,AiContextService,AiDocumentTextService,AiQuotaService,AiRequestService,AiSettlementService,AiDraftsService,BillingConfigurationService,BillingService,BillingEntitlementsService,BillingWorkerService,MfaService,NotificationChannelProviders,IntegrationsService,{provide:PAYMENT_PROVIDER,useFactory:()=>createPaymentProvider(environment)}]})
 export class AppModule {}

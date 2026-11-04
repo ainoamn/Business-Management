@@ -8,6 +8,7 @@ import {environment} from '../config/environment';
 import {csrfFor,digest,dummyPasswordHash,hashPassword,verifyPassword} from '../common/credentials';
 import {validate} from '../common/validation';
 import {createOrganizationSchema,workRegisterSchema} from '@work/shared-schemas';
+import {MfaService} from '../security/mfa.service';
 
 export interface WorkIdentity {id:string;email:string;username:string|null;displayName:string;emailVerified:boolean;sessionId:string}
 export interface OrganizationSummary {id:string;name:string;slug:string;locale:string;timezone:string;role:string;membership_id:string}
@@ -15,7 +16,7 @@ export const workCookie='work_user_session';
 
 @Injectable()
 export class IdentityService {
-  constructor(private readonly db:PrismaService,private readonly mail:MailService){}
+  constructor(private readonly db:PrismaService,private readonly mail:MailService,private readonly mfa:MfaService){}
   async limit(action:string,identifier:string,request:Request,limits={identity:5,ip:30}){
     const keys=[digest(`${action}:identity:${identifier}`),digest(`${action}:ip:${request.ip||request.socket.remoteAddress||'unknown'}`)].sort();
     const attempts=keys.map(key=>({id:randomUUID(),key,action,succeeded:false}));
@@ -49,10 +50,18 @@ export class IdentityService {
     const user=await this.db.user.findFirst({where:{OR:[{email:identifier},{username:identifier}],deletedAt:null}});
     const valid=await verifyPassword(password,user?.passwordHash??dummyPasswordHash);
     if(!user||user.disabledAt||!valid)throw new UnauthorizedException('Invalid credentials');
+    await this.db.userLoginAttempt.updateMany({where:{id:{in:attempts}},data:{succeeded:true}});
+    if(user.mfaEnabled)return this.mfa.createChallenge('USER',user.id);
+    return this.completeMfaLogin(user.id,request,response);
+  }
+  async completeMfaLogin(userId:string,request:Request,response:Response){
     const session=await this.db.$transaction(async tx=>{
-      const fresh=await tx.user.findUnique({where:{id:user.id}});if(!fresh||fresh.disabledAt||fresh.deletedAt||fresh.passwordHash!==user.passwordHash)throw new UnauthorizedException('Invalid credentials');
-      await tx.userLoginAttempt.updateMany({where:{id:{in:attempts}},data:{succeeded:true}});return this.issue(tx,user.id,request);
-    });this.cookie(response,session.token,session.expiresAt);return {ok:true};
+      const fresh=await tx.user.findUnique({where:{id:userId}});
+      if(!fresh||fresh.disabledAt||fresh.deletedAt)throw new UnauthorizedException('Invalid credentials');
+      return this.issue(tx,userId,request);
+    });
+    this.cookie(response,session.token,session.expiresAt);
+    return {ok:true as const};
   }
   async authenticate(request:Request){
     const raw=request.headers.cookie?.split(';').map(value=>value.trim()).find(value=>value.startsWith(`${workCookie}=`))?.slice(workCookie.length+1);

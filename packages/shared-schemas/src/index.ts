@@ -33,6 +33,17 @@ export const environmentSchema = z.object({
   DOCUMENT_SCANNER_MODE:z.enum(['none','clamav']).default('none'),
   CLAMAV_HOST:z.string().min(1).max(253).default('127.0.0.1'),
   CLAMAV_PORT:z.coerce.number().int().min(1).max(65535).default(3310),
+  AI_CREDENTIAL_KEY:z.string().min(32).optional(),
+  MFA_CREDENTIAL_KEY:z.string().min(32).optional(),
+  SMS_PROVIDER_URL:z.string().url().optional(),
+  WHATSAPP_PROVIDER_URL:z.string().url().optional(),
+  VAPID_PUBLIC_KEY:z.string().optional(),
+  VAPID_PRIVATE_KEY:z.string().optional(),
+  PAYMENT_ENDPOINT:z.string().url().optional(),
+  PAYMENT_API_KEY:z.string().min(8).optional(),
+  PAYMENT_WEBHOOK_SECRET:z.string().min(16).optional(),
+  PAYMENT_MODE:z.enum(['SANDBOX','LIVE']).optional(),
+  PAYMENT_CHECKOUT_HOSTS:z.string().min(1).optional(),
 }).superRefine((env, ctx) => {
   if (env.DEPLOYMENT_ENV !== 'development' && env.NODE_ENV !== 'test') {
     if(env.DOCUMENT_STORAGE_MODE==='local')ctx.addIssue({code:'custom',path:['DOCUMENT_STORAGE_MODE'],message:'Local document storage is limited to development'});
