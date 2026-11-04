@@ -1,5 +1,9 @@
 # نشر الواجهة على Vercel
 
+الواجهة المنشورة: https://business-management-sigma.vercel.app
+
+
+
 الاستضافة الحالية تنشر تطبيق Next.js في `apps/web` فقط. خادم NestJS وPostgreSQL وRedis وS3 يبقون خارج Vercel.
 
 ## إعداد المشروع

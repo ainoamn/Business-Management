@@ -2,7 +2,7 @@
 
 ## النشر
 
-المصدر يُرفع إلى https://github.com/ainoamn/Business-Management. واجهة Next.js هي ما يُنشر على Vercel. الخادم وPostgreSQL وRedis وS3 غير مستضافين على Vercel، لذلك الصفحة العامة تعرض الخدمات غير الجاهزة إلى أن يُضبط `API_ORIGIN`. التفاصيل في docs/deployment/vercel.md. مطابقة الأمر الهندسي في docs/product/plan-compliance.md: الخطة لم تُنفَّذ كاملة.
+المصدر مرفوع إلى https://github.com/ainoamn/Business-Management. واجهة Next.js منشورة على https://business-management-sigma.vercel.app. الخادم وPostgreSQL وRedis وS3 غير مستضافين على Vercel، لذلك الصفحة العامة تعرض الخدمات غير الجاهزة إلى أن يُضبط `API_ORIGIN`. التفاصيل في docs/deployment/vercel.md. مطابقة الأمر الهندسي في docs/product/plan-compliance.md: الخطة لم تُنفَّذ كاملة.
 
 ## الحالة الحالية
 

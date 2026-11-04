@@ -24,4 +24,4 @@
 
 ## جلسة 2026-11-04
 
-طُلب رفع كل ملفات الموقع إلى `https://github.com/ainoamn/Business-Management` ونشر الواجهة على Vercel والتحقق من الخطة. رُفع المصدر، ونُشرت واجهة Next.js. خادم NestJS وPostgreSQL وRedis وS3 لا يعملون داخل استضافة Vercel بهذه الجلسة؛ الصفحة العامة توضح أن الخدمات غير جاهزة إلى أن تُربط بيئة تشغيل كاملة عبر `API_ORIGIN`.
+طُلب رفع كل ملفات الموقع إلى `https://github.com/ainoamn/Business-Management` ونشر الواجهة على Vercel والتحقق من الخطة. رُفع المصدر، ونُشرت واجهة Next.js على https://business-management-sigma.vercel.app. خادم NestJS وPostgreSQL وRedis وS3 لا يعملون داخل استضافة Vercel بهذه الجلسة؛ الصفحة العامة توضح أن الخدمات غير جاهزة إلى أن تُربط بيئة تشغيل كاملة عبر `API_ORIGIN`.

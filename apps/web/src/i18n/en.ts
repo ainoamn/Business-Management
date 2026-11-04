@@ -16,7 +16,7 @@ export const en: Record<keyof typeof ar,string> = {
   lastChecked:'Last checked',notChecked:'No completed check yet',
   architecture:'Architecture for growth',architectureDescription:'Separate frontend and backend applications in one repository, with shared packages and clear responsibilities.',
   isolation:'Isolation from the start',isolationDescription:'A restricted database role, transaction-local organization context and row-level access policies.',
-  honest:'Development status',honestDescription:'This is a foundation verification page. Organizations, authentication, tasks and projects will be built and tested in the following phases.',
+  honest:'Development status',honestDescription:'The workspace and platform administration are built in the application and run when the API server and database are available. This deployment serves the interface; the services below are not connected here.',
   api:'API documentation',live:'Server liveness',language:'العربية',theme:'Toggle appearance',
   footer:'Local development environment · not for production',note:'This public page never displays organization data.',
 };
