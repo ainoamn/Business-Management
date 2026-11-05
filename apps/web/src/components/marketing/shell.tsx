@@ -57,6 +57,7 @@ export function MarketingShell({ children }: MarketingShellProps) {
 
         <nav className="marketing-nav" aria-label={locale === 'ar' ? 'التنقل الرئيسي' : 'Main navigation'}>
           <Link href="/features">{t.features}</Link>
+          <Link href="/ai">{t.aiNav}</Link>
           <Link href="/solutions">{t.solutions}</Link>
           <Link href="/industries">{t.industries}</Link>
           <Link href="/pricing">{t.pricing}</Link>
@@ -93,6 +94,7 @@ export function MarketingShell({ children }: MarketingShellProps) {
           <div className="footer-group">
             <h3>{t.features}</h3>
             <Link href="/features">{t.features}</Link>
+            <Link href="/ai">{t.aiNav}</Link>
             <Link href="/templates">{t.templates}</Link>
             <Link href="/pricing">{t.pricing}</Link>
           </div>

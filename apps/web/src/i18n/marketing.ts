@@ -34,6 +34,22 @@ export interface MarketingContent {
   featuresFinanceDesc: string;
   featuresMeetings: string;
   featuresMeetingsDesc: string;
+  aiNav: string;
+  aiTitle: string;
+  aiLead: string;
+  aiNotice: string;
+  aiPlan: string;
+  aiPlanDesc: string;
+  aiSummary: string;
+  aiSummaryDesc: string;
+  aiForecast: string;
+  aiForecastDesc: string;
+  aiCommands: string;
+  aiCommandsDesc: string;
+  aiCredits: string;
+  aiCreditsDesc: string;
+  aiGuard: string;
+  aiGuardDesc: string;
   
   // Solutions Page
   solutionsTitle: string;
@@ -181,6 +197,22 @@ const ar: MarketingContent = {
   featuresFinanceDesc: 'تتبع النفقات، إنشاء فواتير، ورصد الميزانيات ضمن مساحة عملك. كل عملية مالية مرتبطة بالمشاريع والأنشطة.',
   featuresMeetings: 'إدارة الاجتماعات',
   featuresMeetingsDesc: 'جدولة الاجتماعات، تسجيل المحاضر، وربط القرارات بمهام قابلة للتنفيذ. كل اجتماع له سجل كامل وقرارات متابعة.',
+  aiNav: 'الذكاء الاصطناعي',
+  aiTitle: 'مساعد إداري داخل صلاحياتك',
+  aiLead: 'المساعد يقرأ بيانات المؤسسة التي يسمح لك حسابك برؤيتها، ويقترح خططاً وملخصات وتنبؤات تراجعها قبل الحفظ.',
+  aiNotice: 'الإجابات الحقيقية تحتاج مزود نماذج ومفتاحاً في لوحة المنصة. بدون ذلك لا تُعرض نتائج ذكاء اصطناعي مختلقة.',
+  aiPlan: 'إنشاء المهام والمشاريع',
+  aiPlanDesc: 'تكتب هدف العمل بالعربية أو الإنجليزية، فيقترح المراحل والمهام والمدد والمخاطر كمسودة. لا يُحفظ المشروع إلا بعد موافقتك.',
+  aiSummary: 'التحليل والتلخيص',
+  aiSummaryDesc: 'يلخص أداء المؤسسة أو مشروعاً أو مستنداً أو محضر اجتماع، ويستخرج المهام والقرارات والمواعيد من النص.',
+  aiForecast: 'التنبؤ',
+  aiForecastDesc: 'عند توفر سجل كافٍ يقدّر احتمال التأخر وموعد الإكمال وعبء الفرق، مع درجة الثقة والعوامل، دون اعتبار التوقع حقيقة.',
+  aiCommands: 'أوامر باللغة الطبيعية',
+  aiCommandsDesc: 'يمكنك طلب المهام المتأخرة أو ما ينتظر الاعتماد أو تقريراً شهرياً، والنتيجة تبقى داخل نطاق صلاحيتك.',
+  aiCredits: 'رصيد الاستخدام',
+  aiCreditsDesc: 'كل مؤسسة لها رصيد وحدّ حسب الباقة، مع سجل استهلاك وتكلفة. يمكن شراء رصيد إضافي من الاشتراك.',
+  aiGuard: 'ضوابط التنفيذ',
+  aiGuardDesc: 'لا يحذف المساعد بيانات، ولا يعتمد مصروفاً، ولا يرسل موافقة نهائية من تلقاء نفسه. العمليات الحساسة تبقى للمستخدم المخوّل.',
   
   solutionsTitle: 'حلول مصممة لاحتياجات عملك',
   solutionsLead: 'سواء كنت تدير مشاريع، عمليات تشغيلية، أو فريق عمل، نوفر لك الأدوات المناسبة.',
@@ -316,6 +348,22 @@ const en: MarketingContent = {
   featuresDocumentsDesc: 'Upload and share documents with instant preview support, permission control, and attachment linking to work requests and projects.',
   featuresFinance: 'Financial management',
   featuresFinanceDesc: 'Track expenses, create invoices, and monitor budgets within your workspace. Every financial operation is linked to projects and activities.',
+  aiNav: 'AI',
+  aiTitle: 'An administrative assistant inside your permissions',
+  aiLead: 'The assistant reads the organization data your account is allowed to see, and proposes plans, summaries, and forecasts for you to review before anything is saved.',
+  aiNotice: 'Real answers need a model provider and key in the platform console. Without that, the product does not invent AI results.',
+  aiPlan: 'Task and project creation',
+  aiPlanDesc: 'Describe the goal in Arabic or English. The assistant proposes phases, tasks, durations, and risks as a draft. Nothing is saved until you approve it.',
+  aiSummary: 'Analysis and summaries',
+  aiSummaryDesc: 'Summarize organization or project performance, a document, or meeting minutes, and extract tasks, decisions, and dates from the text.',
+  aiForecast: 'Forecasts',
+  aiForecastDesc: 'With enough history it estimates delay risk, completion timing, and team load, and shows confidence and factors. A forecast is not presented as a fact.',
+  aiCommands: 'Natural-language commands',
+  aiCommandsDesc: 'Ask for overdue work, items waiting for approval, or a monthly report. Results stay inside your permission scope.',
+  aiCredits: 'Usage credits',
+  aiCreditsDesc: 'Each organization has a plan limit, a usage ledger, and cost tracking. Extra credit can be purchased with the subscription.',
+  aiGuard: 'Execution limits',
+  aiGuardDesc: 'The assistant does not delete data, approve an expense, or send a final approval on its own. Sensitive actions stay with the authorized user.',
   featuresMeetings: 'Meeting management',
   featuresMeetingsDesc: 'Schedule meetings, record minutes, and link decisions to actionable tasks. Every meeting has a complete record and follow-up decisions.',
   
