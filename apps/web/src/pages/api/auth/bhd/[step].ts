@@ -5,9 +5,14 @@ const STATE_COOKIE = 'bhd_oauth_state';
 const ISSUER = (process.env.BHD_IDENTITY_ISSUER || 'https://id.bhd-om.com').replace(/\/$/, '');
 const CLIENT_ID = (process.env.BHD_OAUTH_CLIENT_ID || 'bhd-work').trim();
 
+function headerValue(value: string | string[] | undefined, fallback: string) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return (raw ?? fallback).split(',')[0]?.trim() || fallback;
+}
+
 function originOf(req: NextApiRequest) {
-  const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
-  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  const proto = headerValue(req.headers['x-forwarded-proto'], 'https');
+  const host = headerValue(req.headers['x-forwarded-host'] || req.headers.host, '');
   return `${proto}://${host}`.replace(/\/$/, '');
 }
 
