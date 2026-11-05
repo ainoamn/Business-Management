@@ -47,15 +47,19 @@ export function seal(payload: string) {
   return `${body}.${signature}`;
 }
 
-export function openSeal(value: string) {
-  const [body, supplied, extra] = value.split('.');
-  if (!body || !supplied || extra) return null;
-  let payload = '';
+function decodeSealBody(body: string) {
   try {
-    payload = Buffer.from(body, 'base64url').toString('utf8');
+    return Buffer.from(body, 'base64url').toString('utf8');
   } catch {
     return null;
   }
+}
+
+export function openSeal(value: string) {
+  const [body, supplied, extra] = value.split('.');
+  if (!body || !supplied || extra) return null;
+  const payload = decodeSealBody(body);
+  if (!payload) return null;
   const expected = createHmac('sha256', stateSecret()).update(payload).digest('base64url');
   const left = Buffer.from(supplied);
   const right = Buffer.from(expected);
