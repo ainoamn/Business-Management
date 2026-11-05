@@ -1,4 +1,6 @@
 import {environment} from '../config/environment';
+import {randomUUID} from 'node:crypto';
+import {platformOrganizationCreateSchema} from '@work/shared-schemas';
 import {createPaymentProvider} from '../billing/payment.factory';
 import {UnconfiguredPaymentProvider} from '../billing/payment-provider';
 import {BadRequestException,ConflictException,Injectable,NotFoundException,ServiceUnavailableException,UnauthorizedException} from '@nestjs/common';
@@ -33,6 +35,7 @@ export class PlatformService {
         if(!fresh||fresh.disabledAt||!session||session.revokedAt||session.expiresAt<=new Date()) throw new UnauthorizedException('Session expired');
         authorize({...actor,isOwner:fresh.isOwner,permissions:permissionsFor(fresh.isOwner,fresh.role?.permissions??[])},permission,['accounts.manage','roles.manage'].includes(permission));
         await tx.$executeRaw`SELECT set_config('app.platform_account_id',${actor.id},true)`;
+        await tx.$executeRaw`SELECT set_config('app.platform_session_id',${actor.sessionId},true)`;
         const result=await operation(tx);
         const resourceId=id??(typeof result==='object'&&result&&'id' in result&&typeof result.id==='string'&&/^[a-f0-9-]{36}$/.test(result.id)?result.id:undefined);
         await this.audit(tx,actor,requestId,id?'UPDATE':'CREATE',resource,resourceId);
@@ -40,6 +43,8 @@ export class PlatformService {
       },{timeout:15000});
     } catch(error) {
       if(error instanceof Prisma.PrismaClientKnownRequestError) {
+        if(error.code==='P2010'&&error.meta?.code==='23505')throw new ConflictException('Record already exists');
+        if(error.code==='P2010'&&['22023','23514'].includes(String(error.meta?.code)))throw new BadRequestException('Choose valid details and an existing verified active owner');
         if(error.code==='P2002') throw new ConflictException('Record already exists');
         if(error.code==='P2025') throw new NotFoundException('Record not found');
         if(error.code==='P2003') throw new BadRequestException('Invalid related record');
@@ -104,6 +109,11 @@ export class PlatformService {
   async create(resource:PlatformResource,body:unknown,actor:PlatformActor,requestId:string) {
     return this.mutate(actor,`${resource}.manage` as PlatformPermission,requestId,resource,undefined,async tx=>{
       switch(resource) {
+        case 'organizations': {
+          const data=validate(platformOrganizationCreateSchema,body),id=randomUUID();
+          await tx.$queryRaw`SELECT platform_create_organization(${id}::uuid,${data.name},${data.slug},${data.ownerEmail})`;
+          return {id};
+        }
         case 'roles':return tx.platformRole.create({data:validate(platformRoleSchema,body)});
         case 'accounts': {
           const data=validate(platformAccountSchema,body);const passwordHash=await hashPassword(data.password);

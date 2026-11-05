@@ -47,7 +47,7 @@ try{
  const budget=(await own('post','budgets').send({name:'[DEMO] ميزانية تدريب',projectId:projects[0].id,currency:'OMR',amount:'1000.000',startsAt:new Date(Date.now()-86400000).toISOString(),endsAt:new Date(Date.now()+30*86400000).toISOString()}).expect(201)).body;
  for(const [title,amount] of [['[DEMO] مصروف تجهيز','25.500'],['[DEMO] مصروف أدوات','12.000']])await own('post','expenses').send({title,projectId:projects[0].id,budgetId:budget.id,currency:'OMR',amount,expenseDate:new Date().toISOString(),approverId:member(people.accountant)}).expect(201);
  await admin.platformAccount.create({data:{email:'platform-'+suffix+'@example.invalid',displayName:'[DEMO] إدارة المنصة',passwordHash:(await admin.user.findUniqueOrThrow({where:{id:owner.session.user.id}})).passwordHash,isOwner:true}});accounts.push({...accounts[0],key:'platform',name:'[DEMO] إدارة المنصة',email:'platform-'+suffix+'@example.invalid'});
- const counts={members:await admin.membership.count(),projects:await admin.project.count(),tasks:await admin.task.count(),meetings:await admin.meeting.count(),documents:await admin.document.count(),expenses:await admin.expense.count(),notifications:await admin.workNotification.count()};
+ const counts={members:await admin.membership.count(),projects:await admin.project.count(),tasks:await admin.task.count(),meetings:await admin.meeting.count(),documents:await admin.workDocument.count(),expenses:await admin.operationalExpense.count(),notifications:await admin.workNotification.count()};
  await writeFile(directory+'/access.json',JSON.stringify({demo:true,id:suffix,database,organizationId:org,createdAt:new Date().toISOString(),accounts,counts},null,2),{mode:0o600});success=true;
  console.log(JSON.stringify({demo:true,id:suffix,database,counts,credentialsFile:directory+'/access.json',start:'pnpm demo:start '+suffix},null,2));
 }finally{
@@ -55,3 +55,5 @@ try{
  if(created&&!success)await provisioner.$executeRawUnsafe(`DROP DATABASE "${database}" WITH (FORCE)`);
  await provisioner.$disconnect();
 }
+
+

@@ -18,7 +18,7 @@ function Cell({value,t}:{value:unknown;t:PlatformText}) {
 export function ResourcePanel({resource,t,session}:{resource:PlatformResource;t:PlatformText;session:PlatformSessionView}) {
   const [data,setData]=useState<PlatformList>();const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [search,setSearch]=useState('');const [query,setQuery]=useState('');const [page,setPage]=useState(1);const [revision,setRevision]=useState(0);const [editor,setEditor]=useState<{row?:PlatformRow}|null>(null);
   const canManage=permitted(session,`${resource}.manage`)&&(!['accounts','roles'].includes(resource)||session.actor.isOwner);
-  const canCreate=canManage&&!['organizations','users','audit'].includes(resource);
+  const canCreate=canManage&&!['users','audit'].includes(resource);
   const reload=useCallback(()=>setRevision(v=>v+1),[]);
   useEffect(()=>{
     const controller=new AbortController();setLoading(true);setError('');
@@ -32,7 +32,7 @@ export function ResourcePanel({resource,t,session}:{resource:PlatformResource;t:
     if(!window.confirm(t.confirmVoid))return;
     try{await platformRequest(`platform/resources/invoices/${id}`,{method:'PATCH',body:{disabled:true},csrf:session.csrf});reload();}catch(reason){setError(errorLabel(t,reason));}
   }
-  const hint=resource==='ledger'?t.manualNote:resource==='plans'?t.limitsNote:resource==='accounts'||resource==='roles'?t.ownerNote:resource==='audit'?t.auditHint:resource==='pages'?t.pageHint:null;
+  const hint=resource==='organizations'?t.organizationCreateHint:resource==='ledger'?t.manualNote:resource==='plans'?t.limitsNote:resource==='accounts'||resource==='roles'?t.ownerNote:resource==='audit'?t.auditHint:resource==='pages'?t.pageHint:null;
   return <section className="admin-panel">
     {hint&&<p className="admin-notice">{hint}</p>}
     <div className="admin-toolbar"><form onSubmit={event=>{event.preventDefault();setPage(1);setQuery(search);}}><input aria-label={t.search} placeholder={t.searchHint} value={search} onChange={event=>setSearch(event.target.value)} maxLength={100}/><button className="admin-button secondary">{t.search}</button></form><div><button className="admin-button secondary" onClick={reload}>{t.refresh}</button>{canCreate&&<button className="admin-button" onClick={()=>setEditor({})}>+ {t.create}</button>}</div></div>

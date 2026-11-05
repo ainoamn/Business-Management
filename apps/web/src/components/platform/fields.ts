@@ -2,7 +2,7 @@ import type {PlatformResource} from '@work/shared-schemas';
 export interface AdminField {key:string;default?:string;type?:'text'|'email'|'password'|'number'|'money'|'textarea'|'checkbox'|'select'|'reference'|'permissions'|'date';options?:string[];resource?:PlatformResource;optional?:boolean}
 export function fieldsFor(resource:PlatformResource,editing:boolean):AdminField[] {
   switch(resource) {
-    case 'organizations':return [{key:'disabled',type:'checkbox'}];
+    case 'organizations':return editing?[{key:'disabled',type:'checkbox'}]:[{key:'name'},{key:'slug'},{key:'ownerEmail',type:'email'}];
     case 'users':return [{key:'displayName'},{key:'disabled',type:'checkbox'}];
     case 'roles':return [{key:'name'},{key:'permissions',type:'permissions'}];
     case 'accounts':return [...(!editing?[{key:'email',type:'email' as const},{key:'password',type:'password' as const}]:[]),{key:'displayName'},{key:'roleId',type:'reference',resource:'roles'},...(editing?[{key:'disabled',type:'checkbox' as const}]:[])];

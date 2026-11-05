@@ -1,4 +1,5 @@
 import {z} from 'zod';
+export const platformOrganizationCreateSchema=z.object({name:z.string().trim().min(2).max(160),slug:z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).min(3).max(80),ownerEmail:z.string().trim().toLowerCase().email().max(254)}).strict();
 
 export const platformResources = ['organizations','users','accounts','roles','plans','subscriptions','invoices','ledger','pages','audit'] as const;
 export const platformPermissions = [
