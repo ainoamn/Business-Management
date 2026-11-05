@@ -4,6 +4,7 @@ import { Button } from '@work/ui';
 import type { Locale } from '@work/shared-types';
 import { marketingDictionary } from '../../i18n/marketing';
 import { usePlatformBrand } from '../../hooks/use-platform-brand';
+import { BhdProductMark } from '../bhd/BhdProductMark';
 import { BhdProgramsFooter } from '../bhd/BhdProgramsFooter';
 
 interface MarketingShellProps {
@@ -47,9 +48,7 @@ export function MarketingShell({ children }: MarketingShellProps) {
     <div className="marketing-shell">
       <header className="marketing-header">
         <Link href="/" className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            W<span>•</span>
-          </span>
+          <BhdProductMark />
           <span>
             <strong>{brand?.platformName ?? 'Work Management Platform'}</strong>
             <small>Oman</small>

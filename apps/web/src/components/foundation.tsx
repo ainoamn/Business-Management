@@ -6,6 +6,7 @@ import { dictionary } from '../i18n';
 import { useReadiness } from '../hooks/use-readiness';
 import Link from 'next/link';
 import {usePlatformBrand} from '../hooks/use-platform-brand';
+import {BhdProductMark} from './bhd/BhdProductMark';
 
 const services = ['database','redis','queue','storage'] as const;
 const hints = {database:'databaseHint',redis:'redisHint',queue:'queueHint',storage:'storageHint'} as const;
@@ -29,7 +30,7 @@ export function Foundation() {
     <Head><title>{t.title}</title><meta name="description" content={t.description}/><meta name="robots" content="noindex,nofollow"/></Head>
     <div className="shell">
       <header className="header">
-        <a className="brand" href="/"><span className="brand-mark" aria-hidden="true">W<span>•</span></span><span><strong>{brand?.platformName??t.title}</strong><small>{t.subtitle}</small></span></a>
+        <a className="brand" href="/"><BhdProductMark /><span><strong>{brand?.platformName??t.title}</strong><small>{t.subtitle}</small></span></a>
         <div className="header-actions"><Link href="/features" className="button button-ghost">{locale==='ar'?'المميزات':'Features'}</Link><Link href="/pricing" className="button button-ghost">{locale==='ar'?'الأسعار':'Pricing'}</Link><Link href="/about" className="button button-ghost">{locale==='ar'?'من نحن':'About'}</Link><Link href="/help" className="button button-ghost">{locale==='ar'?'المساعدة':'Help'}</Link><Link href="/app/dashboard" className="button button-ghost">{locale==='ar'?'مساحة العمل':'Workspace'}</Link><Link href="/register" className="button button-ghost">{locale==='ar'?'إنشاء حساب':'Create account'}</Link><Link href="/platform" className="button button-ghost">{t.admin}</Link><Button className="button-ghost" onClick={toggleLocale}>{t.language}</Button><Button className="button-icon button-ghost" aria-label={t.theme} onClick={toggleTheme}>{dark?'☀':'☾'}</Button></div>
       </header>
       <main>
@@ -37,7 +38,7 @@ export function Foundation() {
           <span className="eyebrow"><span className="line"/>{t.eyebrow}</span>
           <h1>{t.heading}</h1><p>{t.description}</p>
           <div className="phase-tag"><span aria-hidden="true">01</span>{t.phase} / {t.foundation}</div>
-          <div className="hero-orbit" aria-hidden="true"><div/><div/><div/><span>W</span></div>
+          <div className="hero-orbit" aria-hidden="true"><div/><div/><div/><span><BhdProductMark size="hero" /></span></div>
         </div>
         <div className="content-grid">
           <Card className="status-card">

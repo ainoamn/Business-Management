@@ -10,3 +10,11 @@
 .badge>span:last-child{font-size:inherit}
 @media(max-width:720px){.header{flex-wrap:wrap;min-height:90px;height:auto;padding:16px 0;gap:12px}.header-actions{margin-inline-start:auto}}
 @media(prefers-reduced-motion:no-preference){.button{transition:filter .15s}}
+.bhd-product-mark{display:inline-flex;align-items:flex-start;direction:ltr;unicode-bidi:isolate;flex-shrink:0}
+.bhd-product-mark svg{width:4.55rem;height:auto;display:block}
+.bhd-product-mark i{display:grid;min-width:.92rem;min-height:.92rem;place-content:center;margin-block-start:-.08rem;margin-inline-start:.18rem;padding:.08rem .14rem;color:#fff;background:#b58d55;border-radius:.28rem .28rem .28rem .1rem;font-family:Inter,"Segoe UI",sans-serif;font-size:.62rem;font-style:normal;font-weight:900;line-height:1;letter-spacing:0;box-shadow:0 3px 8px rgb(181 141 85 / .2)}
+.bhd-product-mark--hero svg{width:6.4rem}
+.bhd-product-mark--hero i{min-width:1.35rem;min-height:1.35rem;margin-block-start:-.12rem;padding:.1rem .2rem;border-radius:.4rem .4rem .4rem .12rem;font-size:.95rem}
+:root[data-theme=dark] .bhd-product-mark svg{filter:brightness(0) invert(1)}
+:root[data-theme=dark] .bhd-product-mark i{color:#092d24;background:#e4d3b0}
+@media(max-width:720px){.bhd-product-mark svg{width:3.6rem}}
