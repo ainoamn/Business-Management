@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { loadBhdIdentity } from '../../lib/identity/bhd-browser';
+import {useBhdSdkRevision} from '../../lib/identity/use-bhd-sdk';
 
 const SSO_START = '/api/auth/bhd/start';
 
@@ -30,6 +31,7 @@ export function BhdSessionBridge({
   signedIn: boolean;
 }) {
   const router = useRouter();
+  const sdkRevision=useBhdSdkRevision();
   const busy = useRef(false);
 
   useEffect(() => {
@@ -94,7 +96,7 @@ export function BhdSessionBridge({
     return () => {
       cancelled = true;
     };
-  }, [router.isReady, router.asPath, router.query.au, localBhdSub, signedIn]);
+  }, [router.isReady, router.asPath, router.query.au, localBhdSub, signedIn, sdkRevision]);
 
   return null;
 }

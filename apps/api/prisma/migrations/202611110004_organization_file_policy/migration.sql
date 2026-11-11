@@ -1,0 +1,4 @@
+BEGIN;
+ALTER TABLE organization_settings ADD COLUMN document_max_bytes integer,ADD COLUMN document_allowed_extensions text[] NOT NULL DEFAULT ARRAY['pdf','png','jpg','jpeg','txt','csv','docx','xlsx','pptx'],ADD COLUMN file_policy_version integer NOT NULL DEFAULT 1;
+ALTER TABLE organization_settings ADD CONSTRAINT organization_file_maximum CHECK(document_max_bytes IS NULL OR document_max_bytes BETWEEN 1024 AND 104857600),ADD CONSTRAINT organization_file_extensions CHECK(cardinality(document_allowed_extensions) BETWEEN 1 AND 9 AND array_ndims(document_allowed_extensions)=1 AND array_position(document_allowed_extensions,NULL) IS NULL AND document_allowed_extensions<@ARRAY['pdf','png','jpg','jpeg','txt','csv','docx','xlsx','pptx']::text[]),ADD CONSTRAINT organization_file_policy_version CHECK(file_policy_version>0);
+COMMIT;

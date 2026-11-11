@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { BhdAppSwitcher, type BhdSwitcherUser } from './BhdAppSwitcher';
 import { loadBhdIdentity } from '../../lib/identity/bhd-browser';
 import { DEFAULT_IDENTITY_ISSUER } from '../../lib/identity/issuer';
+import {useBhdSdkRevision} from '../../lib/identity/use-bhd-sdk';
 
 function toSwitcherUser(input: {
   id?: string;
@@ -37,6 +38,7 @@ export function BhdWorkspaceChrome({
   fallbackEmail?: string;
   fallbackName?: string;
 }) {
+  const sdkRevision=useBhdSdkRevision();
   const [user, setUser] = useState<BhdSwitcherUser | null>(
     fallbackEmail ? { name: fallbackName || fallbackEmail, email: fallbackEmail, picture: null } : null,
   );
@@ -68,7 +70,7 @@ export function BhdWorkspaceChrome({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sdkRevision]);
 
   const onSwitchAccount = useCallback(async (sub: string) => {
     const identity = await loadBhdIdentity(1200);

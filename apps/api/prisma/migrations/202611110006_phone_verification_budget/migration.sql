@@ -1,0 +1,28 @@
+BEGIN;
+CREATE INDEX phone_verifications_created_at_idx ON phone_verifications(created_at);
+CREATE FUNCTION work_start_phone_challenge(target uuid,target_session uuid,target_contact uuid,next_revision integer,phone_digest text,sealed_phone text,key_digest text,provider_digest text,last_digits text,daily_limit integer) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public SET row_security=off AS $$
+DECLARE member_id uuid;org_id uuid;current_revision integer;BEGIN
+ member_id:=public.work_channel_member(target_session);IF member_id IS NULL THEN RAISE EXCEPTION 'Session expired' USING ERRCODE='42501';END IF;org_id:=NULLIF(current_setting('app.organization_id',true),'')::uuid;
+ IF target IS NULL OR target_contact IS NULL OR next_revision IS NULL OR next_revision<=0 OR phone_digest IS NULL OR phone_digest!~'^[a-f0-9]{64}$' OR key_digest IS NULL OR key_digest!~'^[a-f0-9]{64}$' OR provider_digest IS NULL OR provider_digest!~'^[a-f0-9]{64}$' OR sealed_phone IS NULL OR length(sealed_phone)>6000 OR last_digits IS NULL OR last_digits!~'^[0-9]{4}$' THEN RAISE EXCEPTION 'Invalid phone challenge' USING ERRCODE='22023';END IF;
+ PERFORM pg_advisory_xact_lock(hashtext('phone-verification-daily-budget'));
+ IF (SELECT count(*) FROM public.phone_verifications WHERE created_at>now()-interval '1 day')>=least(greatest(coalesce(daily_limit,100),1),1000) THEN RAISE EXCEPTION 'PHONE_DAILY_LIMIT' USING ERRCODE='P0003';END IF;
+ PERFORM pg_advisory_xact_lock(hashtext('channel-contact:'||org_id::text||':'||member_id::text));
+ IF EXISTS(SELECT 1 FROM public.phone_verifications WHERE organization_id=org_id AND membership_id=member_id AND created_at>now()-interval '60 seconds') THEN RAISE EXCEPTION 'Wait before requesting another code' USING ERRCODE='23514';END IF;
+ INSERT INTO public.notification_phones(id,organization_id,membership_id,updated_at) VALUES(target_contact,org_id,member_id,now()) ON CONFLICT(organization_id,membership_id) DO NOTHING;
+ SELECT revision INTO current_revision FROM public.notification_phones WHERE id=target_contact AND organization_id=org_id AND membership_id=member_id FOR UPDATE;
+ IF current_revision IS NULL OR current_revision+1<>next_revision THEN RAISE EXCEPTION 'Contact changed' USING ERRCODE='40001';END IF;
+ UPDATE public.phone_verifications SET status='CANCELLED',phone_enc='',provider_verification_id=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=now() WHERE organization_id=org_id AND membership_id=member_id AND status IN('PREPARING','PENDING','CHECKING','UNCERTAIN');
+ INSERT INTO public.phone_verifications(id,organization_id,membership_id,contact_id,user_session_id,proposed_revision,phone_enc,phone_hash,last_four,credential_key_hash,provider_key_hash,expires_at,updated_at) VALUES(target,org_id,member_id,target_contact,target_session,next_revision,sealed_phone,phone_digest,last_digits,key_digest,provider_digest,now()+interval '10 minutes',now());RETURN target;
+END $$;
+REVOKE ALL ON FUNCTION work_start_phone_challenge(uuid,uuid,uuid,integer,text,text,text,text,text,integer) FROM PUBLIC;GRANT EXECUTE ON FUNCTION work_start_phone_challenge(uuid,uuid,uuid,integer,text,text,text,text,text,integer) TO work_app;
+
+CREATE OR REPLACE FUNCTION work_start_phone_challenge(target uuid,target_session uuid,target_contact uuid,next_revision integer,phone_digest text,sealed_phone text,key_digest text,provider_digest text,last_digits text) RETURNS uuid LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public SET row_security=off AS $$SELECT public.work_start_phone_challenge(target,target_session,target_contact,next_revision,phone_digest,sealed_phone,key_digest,provider_digest,last_digits,100)$$;
+REVOKE ALL ON FUNCTION work_start_phone_challenge(uuid,uuid,uuid,integer,text,text,text,text,text) FROM PUBLIC;GRANT EXECUTE ON FUNCTION work_start_phone_challenge(uuid,uuid,uuid,integer,text,text,text,text,text) TO work_app;
+CREATE FUNCTION work_revoke_mobile_credentials() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public SET row_security=off AS $$BEGIN
+ IF NEW.password_hash IS DISTINCT FROM OLD.password_hash OR NEW.mfa_version IS DISTINCT FROM OLD.mfa_version OR NEW.disabled_at IS NOT NULL OR NEW.deleted_at IS NOT NULL THEN
+  UPDATE public.notification_phones p SET revision=revision+1,phone_enc=NULL,phone_hash=NULL,credential_key_hash=NULL,last_four=NULL,verified_at=NULL,verification_expires_at=NULL,sms_consented_at=NULL,whatsapp_consented_at=NULL,revoked_at=now(),updated_at=now() WHERE EXISTS(SELECT 1 FROM public.memberships m WHERE m.organization_id=p.organization_id AND m.id=p.membership_id AND m.user_id=NEW.id) AND (p.phone_enc IS NOT NULL OR p.verified_at IS NOT NULL OR p.revoked_at IS NULL);
+  UPDATE public.phone_verifications v SET status=CASE WHEN status IN('PREPARING','PENDING','CHECKING','UNCERTAIN') THEN 'CANCELLED' ELSE status END,phone_enc='',provider_verification_id=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=now() WHERE EXISTS(SELECT 1 FROM public.memberships m WHERE m.organization_id=v.organization_id AND m.id=v.membership_id AND m.user_id=NEW.id) AND (v.phone_enc<>'' OR v.status IN('PREPARING','PENDING','CHECKING','UNCERTAIN'));
+  UPDATE public.notification_preferences p SET sms_enabled=false,whatsapp_enabled=false WHERE EXISTS(SELECT 1 FROM public.memberships m WHERE m.organization_id=p.organization_id AND m.id=p.membership_id AND m.user_id=NEW.id) AND (p.sms_enabled OR p.whatsapp_enabled);
+ END IF;RETURN NEW;END $$;REVOKE ALL ON FUNCTION work_revoke_mobile_credentials() FROM PUBLIC;
+CREATE TRIGGER revoke_mobile_credentials AFTER UPDATE OF password_hash,mfa_version,disabled_at,deleted_at ON users FOR EACH ROW EXECUTE FUNCTION work_revoke_mobile_credentials();
+COMMIT;

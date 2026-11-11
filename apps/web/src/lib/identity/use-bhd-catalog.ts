@@ -8,6 +8,7 @@ import {
   getCachedCatalogApps,
 } from "../bhd/catalog";
 import { loadBhdIdentity } from "./bhd-browser";
+import {useBhdSdkRevision} from './use-bhd-sdk';
 
 function hintOrigin(origin: string) {
   if (!origin || typeof document === "undefined") return;
@@ -20,6 +21,7 @@ function hintOrigin(origin: string) {
 }
 
 export function useBhdCatalog() {
+  const sdkRevision=useBhdSdkRevision();
   const [apps, setApps] = useState<BhdApp[]>(() => getCachedCatalogApps());
 
   useEffect(() => {
@@ -55,7 +57,7 @@ export function useBhdCatalog() {
       cancelled = true;
       window.removeEventListener(BHD_CATALOG_EVENT, onCatalog);
     };
-  }, []);
+  }, [sdkRevision]);
 
   return apps;
 }

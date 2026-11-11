@@ -18,9 +18,10 @@ const provisioner=new PrismaClient({datasourceUrl:source.toString()});let admin,
 const origin=process.env.WEB_ORIGIN||'http://localhost:3000',accounts=[];
 try{
  await provisioner.$executeRawUnsafe(`CREATE DATABASE "${database}"`);created=true;source.pathname='/'+database;
- execFileSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy','--schema',fileURLToPath(new URL('../../apps/api/prisma/schema.prisma',import.meta.url))],{env:{...process.env,DATABASE_URL:source.toString()},windowsHide:true,stdio:'pipe',timeout:60000});
+ execFileSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy','--schema',fileURLToPath(new URL('../../apps/api/prisma/schema.prisma',import.meta.url))],{env:{...process.env,CHECKPOINT_DISABLE:'1',PRISMA_HIDE_UPDATE_MESSAGE:'1',DATABASE_URL:source.toString()},windowsHide:true,stdio:'pipe',timeout:60000});
  admin=new PrismaClient({datasourceUrl:source.toString()});const appUrl=new URL(process.env.DATABASE_URL);appUrl.pathname='/'+database;
  process.env.DATABASE_URL=appUrl.toString();process.env.MAIL_DELIVERY_MODE='outbox';process.env.DOCUMENT_LOCAL_ROOT=directory+'/documents';
+ await admin.platformSettings.create({data:{id:'main',platformName:'[DEMO] منصة التدريب',supportEmail:'demo-support@example.invalid',footerText:'بيانات تجريبية محلية مستقلة'}});
  const {createApp}=require('../../apps/api/dist/bootstrap.js');app=await createApp();await app.init();
  const api=(method,path,actor)=>{let call=request(app.getHttpServer())[method]('/api/v1/work/'+path).set('Origin',origin);if(actor)call=call.set('Cookie',actor.cookie).set('X-CSRF-Token',actor.session.csrf);return call;};
  const token=async email=>{const mail=await admin.emailOutbox.findFirstOrThrow({where:{recipient:email},orderBy:{createdAt:'desc'}});return new URL(mail.textBody.match(/https?:\/\/\S+/)[0]).searchParams.get('token');};

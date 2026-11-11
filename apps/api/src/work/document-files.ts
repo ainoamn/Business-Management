@@ -1,9 +1,10 @@
 /* eslint-disable no-control-regex -- Upload validation deliberately checks Unicode control characters. */
+import {documentExtensions} from '@work/shared-schemas';
 import {BadRequestException} from '@nestjs/common';
 import {createHash} from 'node:crypto';
 import {extname} from 'node:path';
 import {inflateRawSync} from 'node:zlib';
-const types={pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',txt:'text/plain',csv:'text/csv',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation'} as const;
+const types={pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',txt:'text/plain',csv:'text/csv',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation'} as const satisfies Record<(typeof documentExtensions)[number],string>;
 export interface ZipEntry {name:string;method:number;compressedSize:number;size:number;offset:number}
 export interface DocumentFileInput {originalname:string;mimetype:string;buffer:Buffer}
 const rejected=()=>new BadRequestException({code:'FILE_TYPE_REJECTED',message:'Unsupported, unsafe or malformed document'});

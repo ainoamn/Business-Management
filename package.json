@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.14.0",
-  "engines": { "node": ">=22.12.0 <25" },
+  "engines": {
+    "node": ">=22.12.0 <25"
+  },
   "scripts": {
     "setup:env": "node infrastructure/scripts/setup-env.mjs",
     "db:local": "node infrastructure/scripts/local-postgres.mjs",
@@ -34,7 +36,9 @@
     "dev": "dotenv -e .env -- concurrently -k -n api,web \"pnpm --filter @work/api dev\" \"pnpm --filter @work/web dev\"",
     "start:api": "dotenv -e .env -- pnpm --filter @work/api start",
     "start:web": "pnpm --filter @work/web start",
-    "check": "pnpm lint && pnpm typecheck && pnpm test"
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "push:setup": "node infrastructure/scripts/push-setup.mjs",
+    "messaging:setup": "node infrastructure/scripts/messaging-setup.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -50,9 +54,26 @@
     "typescript-eslint": "^8.46.0",
     "vitest": "~4.1.12"
   },
-  "optionalDependencies": {"@embedded-postgres/windows-x64":"18.6.0-beta.19"},
+  "optionalDependencies": {
+    "@embedded-postgres/windows-x64": "18.6.0-beta.19"
+  },
   "pnpm": {
-    "onlyBuiltDependencies": ["@nestjs/core", "@prisma/client", "@prisma/engines", "prisma", "esbuild", "sharp", "unrs-resolver"],
-    "overrides": {"next>postcss":"^8.5.18","@prisma/config>deepmerge-ts":"^8.0.2","@nestjs/platform-express>multer":"^2.5.0","@nestjs/swagger>js-yaml":"^5.4.1","exceljs>uuid":"11.1.1","minimatch":"^11.0.1"}
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ],
+    "overrides": {
+      "next>postcss": "^8.5.18",
+      "@prisma/config>deepmerge-ts": "^8.0.2",
+      "@nestjs/platform-express>multer": "^2.5.0",
+      "@nestjs/swagger>js-yaml": "^5.4.1",
+      "exceljs>uuid": "11.1.1",
+      "minimatch": "^11.0.1"
+    }
   }
 }

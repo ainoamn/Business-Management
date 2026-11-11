@@ -1,0 +1,22 @@
+BEGIN;
+CREATE INDEX push_deliveries_subscription_id_status_idx ON push_deliveries(subscription_id,status);
+CREATE INDEX push_deliveries_organization_id_membership_id_status_idx ON push_deliveries(organization_id,membership_id,status);
+CREATE INDEX push_deliveries_status_lease_expires_at_idx ON push_deliveries(status,lease_expires_at);
+CREATE OR REPLACE FUNCTION work_revoke_push_subscription(target uuid,target_session uuid) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public SET row_security=off AS $$
+DECLARE member_id uuid;org_id uuid;BEGIN
+ member_id:=public.work_push_member(target_session);IF member_id IS NULL THEN RAISE EXCEPTION 'Permission denied' USING ERRCODE='42501';END IF;org_id:=NULLIF(current_setting('app.organization_id',true),'')::uuid;
+ PERFORM pg_advisory_xact_lock(hashtext('push-user:'||NULLIF(current_setting('app.user_id',true),'')::text));
+ IF NOT EXISTS(SELECT 1 FROM public.push_subscriptions WHERE id=target AND organization_id=org_id AND membership_id=member_id) THEN RETURN false;END IF;
+ UPDATE public.push_subscriptions SET disabled_at=now(),credentials_enc=NULL,keys_json='{}',endpoint='disabled:'||id::text,revision=revision+1,updated_at=now() WHERE id=target AND organization_id=org_id AND membership_id=member_id AND (disabled_at IS NULL OR credentials_enc IS NOT NULL OR keys_json<>'{}' OR endpoint NOT LIKE 'disabled:%');
+ IF NOT EXISTS(SELECT 1 FROM public.push_subscriptions p JOIN public.user_sessions s ON s.id=p.user_session_id WHERE p.organization_id=org_id AND p.membership_id=member_id AND p.disabled_at IS NULL AND s.revoked_at IS NULL AND s.expires_at>now()) THEN UPDATE public.notification_preferences SET push_enabled=false WHERE organization_id=org_id AND membership_id=member_id;END IF;RETURN true;
+END $$;REVOKE ALL ON FUNCTION work_revoke_push_subscription(uuid,uuid) FROM PUBLIC;GRANT EXECUTE ON FUNCTION work_revoke_push_subscription(uuid,uuid) TO work_app;
+
+
+CREATE OR REPLACE FUNCTION work_claim_push_deliveries(batch_size integer) RETURNS TABLE(id uuid,organization_id uuid,membership_id uuid,user_id uuid,user_session_id uuid,notification_id uuid,subscription_id uuid,subscription_revision integer,lease_token uuid,credentials_enc text,vapid_key_hash text,locale text,resource_type text,resource_id uuid) LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public SET row_security=off AS $$BEGIN
+ WITH candidates AS(SELECT d.id FROM public.push_deliveries d WHERE d.status='PENDING' AND d.available_at<=now() OR d.status='PROCESSING' AND d.lease_expires_at<=now() ORDER BY d.available_at,d.created_at,d.id LIMIT 100 FOR UPDATE SKIP LOCKED) UPDATE public.push_deliveries d SET status='CANCELLED',last_error='PUSH_CONTEXT_EXPIRED',lease_token=NULL,lease_expires_at=NULL,updated_at=now() FROM candidates c WHERE d.id=c.id AND NOT public.work_push_live(d);
+ WITH candidates AS(SELECT d.id FROM public.push_deliveries d WHERE d.attempts>=8 AND (d.status='PENDING' OR d.status='PROCESSING' AND d.lease_expires_at<=now()) ORDER BY d.available_at,d.created_at,d.id LIMIT 100 FOR UPDATE SKIP LOCKED) UPDATE public.push_deliveries d SET status='FAILED',last_error='PUSH_ATTEMPTS_EXHAUSTED',lease_token=NULL,lease_expires_at=NULL,updated_at=now() FROM candidates c WHERE d.id=c.id;
+ RETURN QUERY WITH chosen AS(SELECT d.id FROM public.push_deliveries d WHERE d.attempts<8 AND (d.status='PENDING' AND d.available_at<=now() OR d.status='PROCESSING' AND d.lease_expires_at<=now()) ORDER BY d.available_at,d.created_at,d.id LIMIT least(greatest(batch_size,1),2) FOR UPDATE SKIP LOCKED),claimed AS(UPDATE public.push_deliveries d SET status='PROCESSING',attempts=d.attempts+1,lease_token=gen_random_uuid(),lease_expires_at=now()+interval '60 seconds',updated_at=now() FROM chosen c WHERE d.id=c.id RETURNING d.*)
+ SELECT c.id,c.organization_id,c.membership_id,m.user_id,c.user_session_id,c.notification_id,c.subscription_id,c.subscription_revision,c.lease_token,p.credentials_enc,p.vapid_key_hash::text,o.locale::text,n.resource_type::text,n.resource_id FROM claimed c JOIN public.push_subscriptions p ON p.id=c.subscription_id JOIN public.work_notifications n ON n.id=c.notification_id JOIN public.memberships m ON m.organization_id=c.organization_id AND m.id=c.membership_id JOIN public.organizations o ON o.id=c.organization_id;
+END $$;REVOKE ALL ON FUNCTION work_claim_push_deliveries(integer) FROM PUBLIC;GRANT EXECUTE ON FUNCTION work_claim_push_deliveries(integer) TO work_app;
+
+COMMIT;

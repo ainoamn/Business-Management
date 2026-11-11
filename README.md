@@ -8,7 +8,7 @@
 
 على Windows يمكن تشغيل PostgreSQL مستقلاً عن Docker عبر `pnpm db:local` ثم `pnpm db:migrate`. لتفعيل حساب المالك الذي تختار بياناته: `pnpm platform:bootstrap` في طرفية تفاعلية؛ لا توجد بيانات دخول افتراضية. اختبارات الإدارة: `pnpm test:platform`، و`pnpm test:platform:browser` مع واجهة web شغالة ومنفذ API 4000 متاح للاختبار المعزول.
 
-**الحالة:** تأسيس محلي قيد التحقق؛ ليست منصة تجارية مكتملة. راجع [PROJECT_STATUS.md](PROJECT_STATUS.md) للنتائج الفعلية والحدود الحالية.
+**الحالة:** لوحة المنصة ومساحة العمل `/app` والصفحات التسويقية وBHD Identity مبنية ومختبرة محلياً. الواجهة منشورة على Vercel؛ الخادم وقاعدة البيانات غير مربوطين بالاستضافة المنشورة بعد. راجع [PROJECT_STATUS.md](PROJECT_STATUS.md) و[سجل نوفمبر](docs/operations/session-history-2026-11.md).
 
 ## التشغيل المحلي
 

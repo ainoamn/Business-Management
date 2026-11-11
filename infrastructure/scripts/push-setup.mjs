@@ -1,0 +1,13 @@
+import {createRequire} from 'node:module';
+import {randomBytes} from 'node:crypto';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+const subject=process.argv[2];
+if(!subject||!/^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subject))throw Error('Usage: pnpm push:setup mailto:operations@example.com');
+const require=createRequire(new URL('../../apps/api/package.json',import.meta.url));
+const {generateVAPIDKeys}=require('web-push');
+const keys=generateVAPIDKeys(),directory=new URL('../../.local/',import.meta.url),destination=new URL('push-configuration.env',directory);
+await mkdir(directory,{recursive:true});
+await writeFile(destination,`VAPID_SUBJECT=${subject}\nVAPID_PUBLIC_KEY=${keys.publicKey}\nVAPID_PRIVATE_KEY=${keys.privateKey}\nPUSH_CREDENTIAL_KEY=${randomBytes(32).toString('hex')}\n`,{flag:'wx',mode:0o600});
+console.log('Created private configuration: '+fileURLToPath(destination));
+console.log('Copy these settings into your private environment and restart the API. Existing files are never overwritten.');

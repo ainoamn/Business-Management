@@ -1,3 +1,7 @@
+import {TwilioMobileProvider,type MobileNotificationProvider} from './mobile-provider';
+import {createHash} from 'node:crypto';
+import {deliverWebPush,vapidConfiguration,type VapidConfiguration} from './web-push-adapter';
+import {pushCredentialKey} from './push-crypto';
 import {Injectable,Logger} from '@nestjs/common';
 import {environment} from '../config/environment';
 
@@ -10,7 +14,11 @@ export interface WhatsAppProvider {
 }
 
 export interface PushProvider {
-  send(subscription:PushSubscription,_payload:PushPayload):Promise<void>;
+  send(subscription:PushSubscription,_payload:PushPayload):Promise<{statusCode:number}>;
+  isEnabled():boolean;
+  getPublicKey():string|undefined;
+  getCredentialKey():Buffer|null;
+  getApplicationKeyHash():string|undefined;
 }
 
 export interface PushSubscription {
@@ -48,53 +56,26 @@ export class UnconfiguredWhatsAppProvider implements WhatsAppProvider {
 export class UnconfiguredPushProvider implements PushProvider {
   private readonly logger=new Logger(UnconfiguredPushProvider.name);
 
-  async send(_subscription:PushSubscription,_payload:PushPayload):Promise<void>{
+  isEnabled(){return false;}
+  getPublicKey(){return undefined;}
+  getCredentialKey(){return null;}
+  getApplicationKeyHash(){return undefined;}
+  async send(_subscription:PushSubscription,_payload:PushPayload):Promise<{statusCode:number}>{
     this.logger.warn('Push provider not configured');
     throw new Error('PUSH_PROVIDER_NOT_CONFIGURED');
   }
 }
 
-/**
- * Reserved adapter for Web Push; delivery is not implemented.
- * Requires VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in environment.
- */
-@Injectable()
-export class WebPushProvider implements PushProvider {
-  private readonly logger=new Logger(WebPushProvider.name);
-  private readonly enabled:boolean;
-  private readonly publicKey:string|undefined;
-  private readonly privateKey:string|undefined;
-
-  constructor(){
-    this.publicKey=environment.VAPID_PUBLIC_KEY;
-    this.privateKey=environment.VAPID_PRIVATE_KEY;
-    this.enabled=!!(this.publicKey&&this.privateKey);
-    if(!this.enabled){
-      this.logger.warn('VAPID keys not configured, push notifications disabled');
-    }
-  }
-
-  isEnabled():boolean{
-    return this.enabled;
-  }
-
-  getPublicKey():string|undefined{
-    return this.publicKey;
-  }
-
-  async send(_subscription:PushSubscription,_payload:PushPayload):Promise<void>{
-    if(!this.enabled){
-      throw new Error('PUSH_PROVIDER_NOT_CONFIGURED');
-    }
-    
-    // In a real implementation, use web-push library here:
-    // import webpush from 'web-push';
-    // webpush.setVapidDetails('mailto:support@example.com', this.publicKey!, this.privateKey!);
-    // await webpush.sendNotification(subscription, JSON.stringify(payload));
-    
-    this.logger.warn('Web Push delivery is not implemented');
-    throw new Error('WEB_PUSH_NOT_IMPLEMENTED_YET');
-  }
+/** Standard encrypted Web Push. Readiness requires valid signing and at-rest keys. */
+export class WebPushProvider implements PushProvider{
+ private readonly config:VapidConfiguration|null;
+ private readonly credentialKey:Buffer|null;
+ constructor(){this.config=vapidConfiguration(environment.VAPID_SUBJECT,environment.VAPID_PUBLIC_KEY,environment.VAPID_PRIVATE_KEY);this.credentialKey=pushCredentialKey(environment.PUSH_CREDENTIAL_KEY);}
+ isEnabled(){return !!(this.config&&this.credentialKey);}
+ getPublicKey(){return this.isEnabled()?this.config!.publicKey:undefined;}
+ getCredentialKey(){return this.isEnabled()?Buffer.from(this.credentialKey!):null;}
+ getApplicationKeyHash(){const key=this.getPublicKey();return key?createHash('sha256').update(key).digest('hex'):undefined;}
+ async send(subscription:PushSubscription,payload:PushPayload){if(!this.isEnabled())throw Error('PUSH_PROVIDER_NOT_CONFIGURED');return deliverWebPush(this.config!,subscription,payload);}
 }
 
 /**
@@ -102,21 +83,15 @@ export class WebPushProvider implements PushProvider {
  */
 @Injectable()
 export class NotificationChannelProviders {
+  mobile:MobileNotificationProvider;
   sms:SmsProvider;
   whatsapp:WhatsAppProvider;
   push:PushProvider;
 
   constructor(){
-    this.sms=environment.SMS_PROVIDER_URL
-      ?new UnconfiguredSmsProvider() // Replace with real implementation when ready
-      :new UnconfiguredSmsProvider();
-    
-    this.whatsapp=environment.WHATSAPP_PROVIDER_URL
-      ?new UnconfiguredWhatsAppProvider() // Replace with real implementation when ready
-      :new UnconfiguredWhatsAppProvider();
-    
-    this.push=environment.VAPID_PUBLIC_KEY&&environment.VAPID_PRIVATE_KEY
-      ?new WebPushProvider()
-      :new UnconfiguredPushProvider();
+    this.mobile=new TwilioMobileProvider();
+    this.sms={send:async(recipient,message)=>{await this.mobile.sendSms(recipient,message);}};
+    this.whatsapp={send:async(recipient,portalUrl)=>{await this.mobile.sendWhatsApp(recipient,portalUrl);}};
+    const push=new WebPushProvider();this.push=push.isEnabled()?push:new UnconfiguredPushProvider();
   }
 }

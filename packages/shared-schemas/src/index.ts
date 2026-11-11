@@ -35,8 +35,23 @@ export const environmentSchema = z.object({
   CLAMAV_PORT:z.coerce.number().int().min(1).max(65535).default(3310),
   AI_CREDENTIAL_KEY:z.string().min(32).optional(),
   MFA_CREDENTIAL_KEY:z.string().min(32).optional(),
+  NOTIFICATION_CONTACT_KEY:z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  NOTIFICATION_DAILY_VERIFICATION_LIMIT:z.coerce.number().int().min(1).max(1000).default(100),
+  NOTIFICATION_DAILY_USER_LIMIT:z.coerce.number().int().min(1).max(100).default(20),
+  NOTIFICATION_DAILY_GLOBAL_LIMIT:z.coerce.number().int().min(1).max(10000).default(200),
+  TWILIO_ACCOUNT_SID:z.string().regex(/^AC[a-f0-9]{32}$/i).optional(),
+  TWILIO_AUTH_TOKEN:z.string().regex(/^[a-f0-9]{32}$/i).optional(),
+  TWILIO_API_KEY_SID:z.string().regex(/^SK[a-f0-9]{32}$/i).optional(),
+  TWILIO_API_KEY_SECRET:z.string().regex(/^\S{32,128}$/).optional(),
+  TWILIO_VERIFY_SERVICE_SID:z.string().regex(/^VA[a-f0-9]{32}$/i).optional(),
+  TWILIO_SMS_FROM:z.string().regex(/^\+[1-9]\d{7,14}$/).optional(),
+  TWILIO_MESSAGING_SERVICE_SID:z.string().regex(/^MG[a-f0-9]{32}$/i).optional(),
+  TWILIO_WHATSAPP_FROM:z.string().regex(/^\+[1-9]\d{7,14}$/).optional(),
+  TWILIO_WHATSAPP_CONTENT_SID:z.string().regex(/^HX[a-f0-9]{32}$/i).optional(),
   SMS_PROVIDER_URL:z.string().url().optional(),
   WHATSAPP_PROVIDER_URL:z.string().url().optional(),
+  VAPID_SUBJECT:z.string().url().max(200).optional(),
+  PUSH_CREDENTIAL_KEY:z.string().regex(/^[a-f0-9]{64}$/i).optional(),
   VAPID_PUBLIC_KEY:z.string().optional(),
   VAPID_PRIVATE_KEY:z.string().optional(),
   PAYMENT_ENDPOINT:z.string().url().optional(),
@@ -78,3 +93,5 @@ export * from './approvals';
 export * from './workload';
 
 export * from './integrations';
+
+export * from './file-policy';
