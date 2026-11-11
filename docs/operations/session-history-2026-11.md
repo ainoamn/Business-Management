@@ -35,6 +35,10 @@
 
 على Vercel تعمل الصفحات العامة وجلسة BHD على الواجهة. عمليات المؤسسة والإدارة التي تحفظ في PostgreSQL تحتاج خادم API مربوطاً بـ`API_ORIGIN`.
 
+## 11 تشرين الثاني — مرجع بيع السيارة المستوردة بالحادث
+
+قدّم المالك شاشات معالج «قم بإنشاء إعلانك» لمسار السيارة المستوردة مع حالة **حادث** (مصدر الشحن، الوجهة، الشاصي، الطراز، السنة، الممشى، الألوان، المواصفات، تاريخ الوصول، السعر، الصور). وُثّق المسار في [imported-accident-car-listing-flow.md](../product/imported-accident-car-listing-flow.md) مع حفظ الصور تحت `docs/product/references/imported-accident-car/`. لم يُبنَ تطبيق سوق سيارات داخل منصة إدارة الأعمال في هذه الجولة.
+
 ## الوثائق المرتبطة
 
 - [دليل الإدارة](../user-guide/platform-admin.md)
@@ -42,3 +46,4 @@
 - [تقرير أمر البناء](construction-order-report.md)
 - [مطابقة الخطة](../product/plan-compliance.md)
 - [نشر Vercel](../deployment/vercel.md)
+- [مسار السيارة المستوردة بالحادث](../product/imported-accident-car-listing-flow.md)
