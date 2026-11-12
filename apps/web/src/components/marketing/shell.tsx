@@ -7,7 +7,6 @@ import { usePlatformBrand } from '../../hooks/use-platform-brand';
 import { BhdProductMark } from '../bhd/BhdProductMark';
 import { BhdProgramsFooter } from '../bhd/BhdProgramsFooter';
 import { BhdProgramsStrip } from '../bhd/BhdProgramsStrip';
-import BhdProgramsStrip from '../bhd/BhdProgramsStrip';
 
 interface MarketingShellProps {
   children: React.ReactNode;
