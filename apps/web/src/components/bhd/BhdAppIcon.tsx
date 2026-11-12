@@ -165,6 +165,17 @@ const SLUG_TO_ICON: Record<string, IconId> = {
   "bhd-hr": "hr",
   legal: "legal",
   "bhd-legal": "legal",
+  work: "office",
+  "bhd-work": "office",
+  cars: "store",
+  "bhd-cars": "store",
+  hikaya: "nasab",
+  "bhd-hikaya": "nasab",
+  ain: "bhd-r",
+  "bhd-ain": "bhd-r",
+  boilerplate: "portal",
+  "bhd-boilerplate": "portal",
+  ahhha: "portal",
 };
 
 export function appIconId(idOrSlug: string): IconId {

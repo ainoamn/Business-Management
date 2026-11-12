@@ -6,6 +6,8 @@ import { marketingDictionary } from '../../i18n/marketing';
 import { usePlatformBrand } from '../../hooks/use-platform-brand';
 import { BhdProductMark } from '../bhd/BhdProductMark';
 import { BhdProgramsFooter } from '../bhd/BhdProgramsFooter';
+import { BhdProgramsStrip } from '../bhd/BhdProgramsStrip';
+import BhdProgramsStrip from '../bhd/BhdProgramsStrip';
 
 interface MarketingShellProps {
   children: React.ReactNode;
@@ -46,6 +48,7 @@ export function MarketingShell({ children }: MarketingShellProps) {
 
   return (
     <div className="marketing-shell">
+      <BhdProgramsStrip locale={locale} />
       <header className="marketing-header">
         <Link href="/" className="brand">
           <BhdProductMark />
@@ -66,6 +69,7 @@ export function MarketingShell({ children }: MarketingShellProps) {
         </nav>
 
         <div className="marketing-actions">
+          <BhdProgramsStrip locale={locale} compact />
           <Link href="/api/auth/bhd/start?returnTo=%2Fapp%2Fdashboard" className="button button-ghost">
             {locale === 'ar' ? 'دخول BHD' : 'BHD sign-in'}
           </Link>
